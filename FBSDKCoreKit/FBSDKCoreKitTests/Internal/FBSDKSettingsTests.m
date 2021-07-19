@@ -16,7 +16,6 @@
 // IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 // CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-#import <OCMock/OCMock.h>
 #import <XCTest/XCTest.h>
 
 #import "FBSDKAppEventsUtility.h"
@@ -24,7 +23,7 @@
 #import "FBSDKCoreKitTests-Swift.h"
 #import "FBSDKSettings.h"
 #import "FBSDKSettings+Internal.h"
-#import "FBSDKTestCase.h"
+#import "FBSDKSettingsProtocol.h"
 #import "NSUserDefaults+FBSDKDataPersisting.h"
 #import "UserDefaultsSpy.h"
 
@@ -34,8 +33,7 @@
 + (void)setUserAgentSuffix:(NSString *)suffix;
 @end
 
-@interface FBSDKSettingsTests : FBSDKTestCase
-
+@interface FBSDKSettingsTests : XCTestCase
 @end
 
 #pragma clang diagnostic push
@@ -43,7 +41,6 @@
 
 @implementation FBSDKSettingsTests
 {
-  id _mockAppEventsUtility;
   UserDefaultsSpy *userDefaultsSpy;
   TestBundle *bundle;
   TestEventLogger *logger;
@@ -128,7 +125,7 @@ static NSString *const whiteSpaceToken = @"   ";
 
 - (void)testSettingBehaviorsFromPlistWithValidEntry
 {
-  NSBundle *realBundle = [NSBundle bundleForClass:FBSDKTestCase.class];
+  NSBundle *realBundle = [NSBundle bundleForClass:self.class];
   FBSDKSettings.infoDictionaryProvider = realBundle;
 
   NSSet<FBSDKLoggingBehavior> *expected = [NSSet setWithArray:@[FBSDKLoggingBehaviorInformational]];
@@ -1174,7 +1171,6 @@ static NSString *const whiteSpaceToken = @"   ";
 {
   // Using false because it is not the default value for `isAutoInitializationEnabled`
   userDefaultsSpy.capturedValues = @{ @"FacebookAutoLogAppEventsEnabled" : @NO };
-  [self stubUserDefaultsWith:userDefaultsSpy];
 
   XCTAssertFalse(
     FBSDKSettings.isAutoLogAppEventsEnabled,
@@ -1307,6 +1303,21 @@ static NSString *const whiteSpaceToken = @"   ";
   XCTAssertTrue(
     FBSDKSettings.shouldUseCachedValuesForExpensiveMetadata,
     "should use cached values for expensive metadata"
+  );
+}
+
+- (void)testSetUseTokenOptimizations
+{
+  FBSDKSettings.sharedSettings.shouldUseTokenOptimizations = NO;
+
+  XCTAssertEqualObjects(
+    userDefaultsSpy.capturedValues[@"com.facebook.sdk.FBSDKSettingsUseTokenOptimizations"],
+    @NO,
+    "Should store whether or not to use token optimizations"
+  );
+  XCTAssertFalse(
+    FBSDKSettings.sharedSettings.shouldUseTokenOptimizations,
+    "Should use token optimizations"
   );
 }
 
@@ -1475,13 +1486,13 @@ static NSString *const whiteSpaceToken = @"   ";
     userDefaultsSpy.capturedValues[@"com.facebook.sdk:FBSDKSettingsInstallTimestamp"],
     "Should not persist the value of before setting it"
   );
-  [FBSDKSettings recordInstall];
+  [FBSDKSettings.sharedSettings recordInstall];
   XCTAssertNotNil(
     userDefaultsSpy.capturedValues[@"com.facebook.sdk:FBSDKSettingsInstallTimestamp"],
     "Should persist the value after setting it"
   );
   NSDate *date = userDefaultsSpy.capturedValues[@"com.facebook.sdk:FBSDKSettingsInstallTimestamp"];
-  [FBSDKSettings recordInstall];
+  [FBSDKSettings.sharedSettings recordInstall];
   XCTAssertEqual(date, userDefaultsSpy.capturedValues[@"com.facebook.sdk:FBSDKSettingsInstallTimestamp"], "Should not change the cached install timesstamp");
 }
 
@@ -1499,7 +1510,7 @@ static NSString *const whiteSpaceToken = @"   ";
 
 - (void)testIsEventDelayTimerExpired
 {
-  [FBSDKSettings recordInstall];
+  [FBSDKSettings.sharedSettings recordInstall];
   XCTAssertFalse([FBSDKSettings isEventDelayTimerExpired]);
 
   NSDate *today = [NSDate new];
@@ -1515,7 +1526,7 @@ static NSString *const whiteSpaceToken = @"   ";
 
 - (void)testIsSetATETimeExceedsInstallTime
 {
-  [FBSDKSettings recordInstall];
+  [FBSDKSettings.sharedSettings recordInstall];
   [FBSDKSettings recordSetAdvertiserTrackingEnabled];
   XCTAssertFalse([FBSDKSettings isSetATETimeExceedsInstallTime]);
   [FBSDKSettings recordSetAdvertiserTrackingEnabled];

@@ -18,8 +18,9 @@
 
 #import "FBSDKLogger.h"
 
-#import "FBSDKInternalUtility.h"
-#import "FBSDKSettings+Internal.h"
+#import "FBSDKCoreKitBasicsImport.h"
+#import "FBSDKInternalUtility+Internal.h"
+#import "FBSDKSettings.h"
 
 static NSUInteger g_serialNumberCounter = 1111;
 static NSMutableDictionary *g_stringsToReplace = nil;
@@ -41,7 +42,7 @@ static NSMutableDictionary *g_startTimesWithTags = nil;
     _active = [FBSDKSettings.loggingBehaviors containsObject:loggingBehavior];
     _loggingBehavior = loggingBehavior;
     if (_active) {
-      _internalContents = [[NSMutableString alloc] init];
+      _internalContents = [NSMutableString new];
       _loggerSerialNumber = [FBSDKLogger generateSerialNumber];
     }
   }
@@ -117,29 +118,23 @@ static NSMutableDictionary *g_startTimesWithTags = nil;
 
 + (NSUInteger)generateSerialNumber
 {
-  return g_serialNumberCounter++;
+  @synchronized(self) {
+    return ++g_serialNumberCounter;
+  }
 }
 
 + (void)singleShotLogEntry:(NSString *)loggingBehavior
                   logEntry:(NSString *)logEntry
 {
-  if ([FBSDKSettings.loggingBehaviors containsObject:loggingBehavior]) {
-    FBSDKLogger *logger = [[FBSDKLogger alloc] initWithLoggingBehavior:loggingBehavior];
-    [logger appendString:logEntry];
-    [logger emitToNSLog];
-  }
+  FBSDKLogger *logger = [[FBSDKLogger alloc] initWithLoggingBehavior:loggingBehavior];
+  [logger logEntry:logEntry];
 }
 
-+ (void)singleShotLogEntry:(NSString *)loggingBehavior
-              formatString:(NSString *)formatString, ...
+- (void)logEntry:(NSString *)logEntry
 {
-  if ([FBSDKSettings.loggingBehaviors containsObject:loggingBehavior]) {
-    va_list vaArguments;
-    va_start(vaArguments, formatString);
-    NSString *logString = [[NSString alloc] initWithFormat:formatString arguments:vaArguments];
-    va_end(vaArguments);
-
-    [self singleShotLogEntry:loggingBehavior logEntry:logString];
+  if ([FBSDKSettings.loggingBehaviors containsObject:_loggingBehavior]) {
+    [self appendString:logEntry];
+    [self emitToNSLog];
   }
 }
 
@@ -161,7 +156,7 @@ static NSMutableDictionary *g_startTimesWithTags = nil;
 
     // Only log if there's been an associated start time.
     if (startTimeNumber != nil) {
-      uint64_t elapsed = [FBSDKInternalUtility currentTimeInMilliseconds] - startTimeNumber.unsignedLongLongValue;
+      uint64_t elapsed = [FBSDKInternalUtility.sharedUtility currentTimeInMilliseconds] - startTimeNumber.unsignedLongLongValue;
       [g_startTimesWithTags removeObjectForKey:tagAsNumber]; // served its purpose, remove
 
       // Log string is appended with "%d msec", with nothing intervening.  This gives the most control to the caller.
@@ -177,7 +172,7 @@ static NSMutableDictionary *g_startTimesWithTags = nil;
 {
   if ([FBSDKSettings.loggingBehaviors containsObject:loggingBehavior]) {
     if (!g_startTimesWithTags) {
-      g_startTimesWithTags = [[NSMutableDictionary alloc] init];
+      g_startTimesWithTags = [NSMutableDictionary new];
     }
 
     if (g_startTimesWithTags.count >= 1000) {
@@ -185,7 +180,7 @@ static NSMutableDictionary *g_startTimesWithTags = nil;
        @"Unexpectedly large number of outstanding perf logging start times, something is likely wrong."];
     }
 
-    uint64_t currTime = [FBSDKInternalUtility currentTimeInMilliseconds];
+    uint64_t currTime = [FBSDKInternalUtility.sharedUtility currentTimeInMilliseconds];
 
     // Treat the incoming object tag simply as an address, since it's only used to identify during lifetime.  If
     // we send in as an object, the dictionary will try to copy it.
@@ -201,7 +196,7 @@ static NSMutableDictionary *g_startTimesWithTags = nil;
 
   if (FBSDKSettings.loggingBehaviors.count > 0) { // otherwise there's no logging.
     if (!g_stringsToReplace) {
-      g_stringsToReplace = [[NSMutableDictionary alloc] init];
+      g_stringsToReplace = [NSMutableDictionary new];
     }
 
     [g_stringsToReplace setValue:replaceWith forKey:replace];

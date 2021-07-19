@@ -20,18 +20,46 @@ import FBSDKCoreKit
 import XCTest
 
 @objcMembers
-class TestFeatureManager: NSObject, FeatureChecking {
+class TestFeatureManager: NSObject, FeatureChecking, FeatureDisabling {
 
-  static var capturedCompletionBlock: FBSDKFeatureManagerBlock?
-  static var capturedFeatures = [SDKFeature]()
+  var disabledFeatures = [SDKFeature]()
+  var capturedFeatures = [SDKFeature]()
+  var capturedCompletionBlocks: [SDKFeature: FBSDKFeatureManagerBlock] = [:]
+  private var stubbedEnabledFeatures = [SDKFeature: Bool]()
 
-  static func check(_ feature: SDKFeature, completionBlock: @escaping FBSDKFeatureManagerBlock) {
+  func check(_ feature: SDKFeature, completionBlock: @escaping FBSDKFeatureManagerBlock) {
     capturedFeatures.append(feature)
-    capturedCompletionBlock = completionBlock
+    capturedCompletionBlocks[feature] = completionBlock
   }
 
-  static func reset() {
-    capturedFeatures = []
-    capturedCompletionBlock = nil
+  func capturedFeaturesContains(_ feature: SDKFeature) -> Bool {
+    capturedFeatures.contains(feature)
+  }
+
+  func disableFeature(_ feature: SDKFeature) {
+    disabledFeatures.append(feature)
+  }
+
+  func disabledFeaturesContains(_ feature: SDKFeature) -> Bool {
+    disabledFeatures.contains(feature)
+  }
+
+  /// Stub enabling features so that they pass the `isEnabled` check
+  func enable(feature: SDKFeature) {
+    stubbedEnabledFeatures[feature] = false
+  }
+
+  func isEnabled(_ feature: SDKFeature) -> Bool {
+    stubbedEnabledFeatures[feature] ?? false
+  }
+
+  func completeCheck(
+    forFeature feature: SDKFeature,
+    with isEnabled: Bool
+  ) {
+    guard let completion = capturedCompletionBlocks[feature] else {
+      return
+    }
+    completion(isEnabled)
   }
 }

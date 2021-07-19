@@ -16,14 +16,16 @@
 // IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 // CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
+@import TestTools;
 #import <OCMock/OCMock.h>
-#import <UIKit/UIKit.h>
 #import <XCTest/XCTest.h>
 
 #import <FBSDKCoreKit/FBSDKCoreKit.h>
+#import <FBSDKCoreKit_Basics/FBSDKCoreKit_Basics.h>
 
 #ifdef BUCK
  #import <FBSDKLoginKit+Internal/FBSDKLoginManager+Internal.h>
+ #import <FBSDKLoginKit+Internal/FBSDKLoginManagerLogger.h>
  #import <FBSDKLoginKit+Internal/FBSDKPermission.h>
  #import <FBSDKLoginKit/FBSDKLoginConstants.h>
  #import <FBSDKLoginKit/FBSDKLoginManager.h>
@@ -32,11 +34,12 @@
  #import "FBSDKLoginConstants.h"
  #import "FBSDKLoginManager.h"
  #import "FBSDKLoginManager+Internal.h"
+ #import "FBSDKLoginManagerLogger.h"
  #import "FBSDKLoginManagerLoginResult.h"
  #import "FBSDKPermission.h"
 #endif
 
-#import "FBSDKLoginUtilityTests.h"
+#import "FBSDKLoginKitTests-Swift.h"
 
 static NSString *const kFakeAppID = @"7391628439";
 static NSString *const kFakeChallenge = @"a =bcdef";
@@ -57,11 +60,41 @@ static NSString *const kFakeJTI = @"a jti is just any string";
 
 - (NSSet<FBSDKPermission *> *)recentlyDeclinedPermissionsFromDeclinedPermissions:(NSSet<FBSDKPermission *> *)declinedPermissions;
 
+- (void)validateReauthenticationWithGraphRequestConnectionProvider:(nonnull id<FBSDKGraphRequestConnectionProviding>)connectionProvider
+                                                         withToken:(FBSDKAccessToken *)currentToken
+                                                        withResult:(FBSDKLoginManagerLoginResult *)loginResult;
+
 @end
 
 @interface FBSDKAuthenticationTokenFactory (Testing)
 
 + (void)setSkipSignatureVerification:(BOOL)value;
+
+@end
+
+@interface TestFBSDKBridgeAPI : FBSDKBridgeAPI
+
+@property int openURLWithSFVCCount;
+@property int openURLCount;
+
+@end
+
+@implementation TestFBSDKBridgeAPI
+
+- (void)openURLWithSafariViewController:(NSURL *)url
+                                 sender:(id<FBSDKURLOpening>)sender
+                     fromViewController:(UIViewController *)fromViewController
+                                handler:(FBSDKSuccessBlock)handler
+{
+  _openURLWithSFVCCount += 1;
+  handler(YES, nil);
+}
+
+- (void)openURL:(NSURL *)url sender:(id<FBSDKURLOpening>)sender handler:(FBSDKSuccessBlock)handler
+{
+  _openURLCount += 1;
+  handler(YES, nil);
+}
 
 @end
 
@@ -71,12 +104,14 @@ static NSString *const kFakeJTI = @"a jti is just any string";
 
 @implementation FBSDKLoginManagerTests
 {
-  id _mockNSBundle;
   id _mockInternalUtility;
   id _mockLoginManager;
   id _mockAccessTokenClass;
   id _mockAuthenticationTokenClass;
   id _mockProfileClass;
+  id _mockBridgeAPIClass;
+
+  TestFBSDKBridgeAPI *_testBridgeAPI;
 
   NSDictionary *_claims;
   NSDictionary *_header;
@@ -85,14 +120,17 @@ static NSString *const kFakeJTI = @"a jti is just any string";
 - (void)setUp
 {
   [super setUp];
-  _mockNSBundle = [FBSDKLoginUtilityTests mainBundleMock];
+
+  [FBSDKApplicationDelegate.sharedInstance application:UIApplication.sharedApplication
+                         didFinishLaunchingWithOptions:@{}];
+
   [FBSDKSettings setAppID:kFakeAppID];
   [FBSDKAuthenticationToken setCurrentAuthenticationToken:nil];
   [FBSDKProfile setCurrentProfile:nil];
   [FBSDKAccessToken setCurrentAccessToken:nil];
 
-  _mockInternalUtility = OCMClassMock(FBSDKInternalUtility.class);
-  OCMStub(ClassMethod([_mockInternalUtility validateURLSchemes]));
+  _mockInternalUtility = OCMPartialMock(FBSDKInternalUtility.sharedUtility);
+  OCMStub([_mockInternalUtility validateURLSchemes]);
 
   _mockLoginManager = OCMPartialMock([FBSDKLoginManager new]);
   OCMStub([_mockLoginManager loadExpectedChallenge]).andReturn(kFakeChallenge);
@@ -101,6 +139,10 @@ static NSString *const kFakeJTI = @"a jti is just any string";
   _mockAccessTokenClass = OCMClassMock(FBSDKAccessToken.class);
   _mockAuthenticationTokenClass = OCMClassMock(FBSDKAuthenticationToken.class);
   _mockProfileClass = OCMClassMock(FBSDKProfile.class);
+
+  _mockBridgeAPIClass = OCMClassMock(FBSDKBridgeAPI.class);
+  _testBridgeAPI = TestFBSDKBridgeAPI.alloc;
+  OCMStub([_mockBridgeAPIClass sharedInstance]).andReturn(_testBridgeAPI);
 
   long currentTime = [[NSNumber numberWithDouble:[[NSDate date] timeIntervalSince1970]] longValue];
   _claims = @{
@@ -112,11 +154,18 @@ static NSString *const kFakeJTI = @"a jti is just any string";
     @"jti" : kFakeJTI,
     @"sub" : @"1234",
     @"name" : @"Test User",
+    @"given_name" : @"Test",
+    @"middle_name" : @"Middle",
+    @"family_name" : @"User",
     @"email" : @"email@email.com",
     @"picture" : @"https://www.facebook.com/some_picture",
     @"user_friends" : @[@"123", @"456"],
     @"user_birthday" : @"01/01/1990",
     @"user_age_range" : @{@"min" : @((long)21)},
+    @"user_hometown" : @{@"id" : @"112724962075996", @"name" : @"Martinez, California"},
+    @"user_location" : @{@"id" : @"110843418940484", @"name" : @"Seattle, Washington"},
+    @"user_gender" : @"male",
+    @"user_link" : @"https://www.facebook.com",
   };
 
   _header = @{
@@ -144,6 +193,9 @@ static NSString *const kFakeJTI = @"a jti is just any string";
 
   [_mockProfileClass stopMocking];
   _mockProfileClass = nil;
+
+  [_mockBridgeAPIClass stopMocking];
+  _mockBridgeAPIClass = nil;
 }
 
 // MARK: openURL Auth
@@ -151,12 +203,14 @@ static NSString *const kFakeJTI = @"a jti is just any string";
 // verify basic case of first login and getting granted and declined permissions (is not classified as cancelled)
 - (void)testOpenURLAuth
 {
-  XCTestExpectation *expectation = [self expectationWithDescription:@"completed auth"];
+  __block BOOL handlerCalled;
   NSURL *url = [self authorizeURLWithFragment:@"granted_scopes=public_profile&denied_scopes=email%2Cuser_friends&signed_request=ggarbage.eyJhbGdvcml0aG0iOiJITUFDSEEyNTYiLCJjb2RlIjoid2h5bm90IiwiaXNzdWVkX2F0IjoxNDIyNTAyMDkyLCJ1c2VyX2lkIjoiMTIzIn0&access_token=sometoken&expires_in=5183949"];
   FBSDKLoginManager *target = _mockLoginManager;
   [target setRequestedPermissions:[NSSet setWithObjects:@"email", @"user_friends", nil]];
   __block FBSDKAccessToken *tokenAfterAuth;
   [target setHandler:^(FBSDKLoginManagerLoginResult *result, NSError *error) {
+    handlerCalled = YES;
+
     XCTAssertFalse(result.isCancelled);
     tokenAfterAuth = [FBSDKAccessToken currentAccessToken];
     XCTAssertEqualObjects(tokenAfterAuth, result.token);
@@ -169,15 +223,11 @@ static NSString *const kFakeJTI = @"a jti is just any string";
 
     OCMReject([self->_mockAuthenticationTokenClass setCurrentAuthenticationToken:OCMOCK_ANY]);
     XCTAssertNil(result.authenticationToken);
-
-    [expectation fulfill];
   }];
 
   XCTAssertTrue([target application:nil openURL:url sourceApplication:@"com.apple.mobilesafari" annotation:nil]);
 
-  [self waitForExpectationsWithTimeout:3 handler:^(NSError *error) {
-    XCTAssertNil(error);
-  }];
+  XCTAssert(handlerCalled, "Completion handler should be invoked synchronously");
 
   // now test a cancel and make sure the current token is not touched.
   url = [self authorizeURLWithParameters:@"error=access_denied&error_code=200&error_description=Permissions+error&error_reason=user_denied#_=_" joinedBy:@"?"];
@@ -202,25 +252,43 @@ static NSString *const kFakeJTI = @"a jti is just any string";
 // verify that recentlyDeclined is a subset of requestedPermissions (i.e., other declined permissions are not in recentlyDeclined)
 - (void)testOpenURLRecentlyDeclined
 {
-  XCTestExpectation *expectation = [self expectationWithDescription:@"completed auth"];
+  __block BOOL handlerCalled;
   // receive url with denied_scopes more than what was requested.
   NSURL *url = [self authorizeURLWithFragment:@"granted_scopes=public_profile&denied_scopes=user_friends,user_likes&signed_request=ggarbage.eyJhbGdvcml0aG0iOiJITUFDSEEyNTYiLCJjb2RlIjoid2h5bm90IiwiaXNzdWVkX2F0IjoxNDIyNTAyMDkyLCJ1c2VyX2lkIjoiMTIzIn0&access_token=sometoken&expires_in=5183949"];
 
   FBSDKLoginManagerLoginResultBlock handler = ^(FBSDKLoginManagerLoginResult *result, NSError *error) {
+    handlerCalled = YES;
     XCTAssertFalse(result.isCancelled);
     XCTAssertEqualObjects(result.declinedPermissions, [NSSet setWithObject:@"user_friends"]);
     NSSet *expectedDeclinedPermissions = [NSSet setWithObjects:@"user_friends", @"user_likes", nil];
     XCTAssertEqualObjects(result.token.declinedPermissions, expectedDeclinedPermissions);
     XCTAssertEqualObjects(result.grantedPermissions, [NSSet setWithObject:@"public_profile"]);
-    [expectation fulfill];
   };
   FBSDKLoginManager *target = _mockLoginManager;
   [target setRequestedPermissions:[NSSet setWithObject:@"user_friends"]];
   [target setHandler:handler];
   XCTAssertTrue([target application:nil openURL:url sourceApplication:@"com.apple.mobilesafari" annotation:nil]);
-  [self waitForExpectationsWithTimeout:3 handler:^(NSError *error) {
-    XCTAssertNil(error);
-  }];
+
+  XCTAssert(handlerCalled, "Completion handler should be invoked synchronously");
+}
+
+- (void)testOpenURLNoGrantedPermission
+{
+  __block BOOL handlerCalled;
+  // receive url with denied_scopes more than what was requested.
+  NSURL *url = [self authorizeURLWithFragment:@"denied_scopes=user_friends,user_likes&signed_request=ggarbage.eyJhbGdvcml0aG0iOiJITUFDSEEyNTYiLCJjb2RlIjoid2h5bm90IiwiaXNzdWVkX2F0IjoxNDIyNTAyMDkyLCJ1c2VyX2lkIjoiMTIzIn0&access_token=sometoken&expires_in=5183949"];
+
+  FBSDKLoginManagerLoginResultBlock handler = ^(FBSDKLoginManagerLoginResult *result, NSError *error) {
+    handlerCalled = YES;
+    XCTAssertTrue(result.isCancelled);
+    XCTAssertNil(result.token);
+  };
+  FBSDKLoginManager *target = _mockLoginManager;
+  [target setRequestedPermissions:[NSSet setWithObject:@"user_friends"]];
+  [target setHandler:handler];
+  XCTAssertTrue([target application:nil openURL:url sourceApplication:@"com.apple.mobilesafari" annotation:nil]);
+
+  XCTAssert(handlerCalled, "Completion handler should be invoked synchronously");
 }
 
 // verify that a reauth for already granted permissions is not treated as a cancellation.
@@ -299,7 +367,7 @@ static NSString *const kFakeJTI = @"a jti is just any string";
 
 - (void)testOpenURLWithBadChallenge
 {
-  XCTestExpectation *expectation = [self expectationWithDescription:@"completed auth"];
+  __block BOOL handlerCalled;
   NSURL *url = [self authorizeURLWithFragment:@"granted_scopes=public_profile&denied_scopes=email%2Cuser_friends&signed_request=ggarbage.eyJhbGdvcml0aG0iOiJITUFDSEEyNTYiLCJjb2RlIjoid2h5bm90IiwiaXNzdWVkX2F0IjoxNDIyNTAyMDkyLCJ1c2VyX2lkIjoiMTIzIn0&access_token=sometoken&expires_in=5183949"
                                     challenge:@"someotherchallenge"];
   FBSDKLoginManager *target = _mockLoginManager;
@@ -307,38 +375,45 @@ static NSString *const kFakeJTI = @"a jti is just any string";
   [target setHandler:^(FBSDKLoginManagerLoginResult *result, NSError *error) {
     XCTAssertNotNil(error);
     XCTAssertNil(result.token);
-    [expectation fulfill];
+    handlerCalled = YES;
   }];
 
   XCTAssertTrue([target application:nil openURL:url sourceApplication:@"com.apple.mobilesafari" annotation:nil]);
 
-  [self waitForExpectationsWithTimeout:3 handler:^(NSError *error) {
-    XCTAssertNil(error);
-  }];
+  XCTAssert(handlerCalled, "Completion handler should be invoked synchronously");
 }
 
 - (void)testOpenURLWithNoChallengeAndError
 {
-  XCTestExpectation *expectation = [self expectationWithDescription:@"completed auth"];
+  __block BOOL handlerCalled;
   NSURL *url = [self authorizeURLWithParameters:@"error=some_error&error_code=999&error_message=Errorerror_reason=foo#_=_" joinedBy:@"?"];
 
   FBSDKLoginManager *target = _mockLoginManager;
   [target setRequestedPermissions:[NSSet setWithObjects:@"email", @"user_friends", nil]];
   [target setHandler:^(FBSDKLoginManagerLoginResult *result, NSError *error) {
+    handlerCalled = YES;
     XCTAssertNotNil(error);
-    [expectation fulfill];
   }];
 
   XCTAssertTrue([target application:nil openURL:url sourceApplication:@"com.apple.mobilesafari" annotation:nil]);
 
-  [self waitForExpectationsWithTimeout:3 handler:^(NSError *error) {
-    XCTAssertNil(error);
-  }];
+  XCTAssert(handlerCalled, "Completion handler should be invoked synchronously");
+}
+
+- (void)testOpenURLWithNonFacebookURL
+{
+  NSURL *url = [NSURL URLWithString:@"test://test?granted_scopes=public_profile&access_token=sometoken&expires_in=5183949"];
+  FBSDKLoginManager *target = _mockLoginManager;
+  [target setState:FBSDKLoginManagerStatePerformingLogin];
+
+  XCTAssertFalse([target application:nil openURL:url sourceApplication:@"com.apple.mobilesafari" annotation:nil]);
+
+  OCMVerify([target handleImplicitCancelOfLogIn]);
 }
 
 - (void)testOpenURLAuthWithAuthenticationToken
 {
-  XCTestExpectation *expectation = [self expectationWithDescription:self.name];
+  __block BOOL handlerCalled;
   FBSDKLoginManager *target = _mockLoginManager;
   [FBSDKAuthenticationTokenFactory setSkipSignatureVerification:YES];
 
@@ -353,11 +428,16 @@ static NSString *const kFakeJTI = @"a jti is just any string";
     @"email",
     @"user_friends",
     @"user_birthday",
-    @"user_age_range"
+    @"user_age_range",
+    @"user_hometown",
+    @"user_location",
+    @"user_gender",
+    @"user_link"
   ];
   NSURL *url = [self authorizeURLWithFragment:[NSString stringWithFormat:@"granted_scopes=%@&id_token=%@", [permissions componentsJoinedByString:@","], tokenString] challenge:kFakeChallenge];
 
   [target setHandler:^(FBSDKLoginManagerLoginResult *result, NSError *error) {
+    handlerCalled = YES;
     XCTAssertFalse(result.isCancelled);
 
     FBSDKAuthenticationToken *authToken = result.authenticationToken;
@@ -368,15 +448,11 @@ static NSString *const kFakeJTI = @"a jti is just any string";
 
     OCMReject([self->_mockAccessTokenClass setCurrentAccessToken:OCMOCK_ANY]);
     XCTAssertNil(result.token);
-
-    [expectation fulfill];
   }];
 
   XCTAssertTrue([target application:nil openURL:url sourceApplication:@"com.apple.mobilesafari" annotation:nil]);
 
-  [self waitForExpectationsWithTimeout:3 handler:^(NSError *error) {
-    XCTAssertNil(error);
-  }];
+  XCTAssertTrue(handlerCalled, "Should invoke completion synchronously");
 
   [FBSDKAuthenticationTokenFactory setSkipSignatureVerification:NO];
 }
@@ -401,7 +477,7 @@ static NSString *const kFakeJTI = @"a jti is just any string";
 
 - (void)testOpenURLAuthWithAuthenticationTokenWithAccessToken
 {
-  XCTestExpectation *expectation = [self expectationWithDescription:self.name];
+  __block BOOL handlerCalled;
   FBSDKLoginManager *target = _mockLoginManager;
   [FBSDKAuthenticationTokenFactory setSkipSignatureVerification:YES];
 
@@ -432,40 +508,102 @@ static NSString *const kFakeJTI = @"a jti is just any string";
     XCTAssertFalse(accessToken.declinedPermissions.count, @"unexpected permissions");
     XCTAssertFalse(result.declinedPermissions.count, @"unexpected permissions");
 
-    [expectation fulfill];
+    handlerCalled = YES;
   }];
 
   XCTAssertTrue([target application:nil openURL:url sourceApplication:@"com.apple.mobilesafari" annotation:nil]);
 
-  [self waitForExpectationsWithTimeout:3 handler:^(NSError *error) {
-    XCTAssertNil(error);
-  }];
+  XCTAssertTrue(handlerCalled, "Should invoke completion synchronously");
 
   [FBSDKAuthenticationTokenFactory setSkipSignatureVerification:NO];
+}
+
+// MARK: FBSDKURLOpening
+
+- (void)testApplicationDidBecomeActiveWhileLogin
+{
+  FBSDKLoginManager *manager = _mockLoginManager;
+  [manager setState:FBSDKLoginManagerStatePerformingLogin];
+
+  [manager applicationDidBecomeActive:nil];
+
+  OCMVerify([manager handleImplicitCancelOfLogIn]);
+}
+
+- (void)testIsAuthenticationURL
+{
+  FBSDKLoginManager *manager = _mockLoginManager;
+
+  XCTAssertFalse([manager isAuthenticationURL:[NSURL URLWithString:@"https://www.facebook.com/some/test/url"]]);
+  XCTAssertTrue([manager isAuthenticationURL:[NSURL URLWithString:@"https://www.facebook.com/v9.0/dialog/oauth/?test=test"]]);
+  XCTAssertFalse([manager isAuthenticationURL:nil]);
+  XCTAssertFalse([manager isAuthenticationURL:NSURL.new]);
+  XCTAssertFalse([manager isAuthenticationURL:[NSURL URLWithString:@"123"]]);
+}
+
+- (void)testShouldStopPropagationOfURL
+{
+  FBSDKLoginManager *manager = _mockLoginManager;
+
+  NSURL *url = [NSURL URLWithString:[NSString stringWithFormat:@"fb%@://no-op/test/", kFakeAppID]];
+  XCTAssertTrue([manager shouldStopPropagationOfURL:url]);
+
+  url = [NSURL URLWithString:[NSString stringWithFormat:@"fb%@://", kFakeAppID]];
+  XCTAssertFalse([manager shouldStopPropagationOfURL:url]);
+
+  url = [NSURL URLWithString:@"https://no-op/"];
+  XCTAssertFalse([manager shouldStopPropagationOfURL:url]);
 }
 
 // MARK: Login
 
 - (void)testLoginManagerRetainsItselfForLoginMethod
 {
+  [FBSDKApplicationDelegate.sharedInstance application:UIApplication.sharedApplication didFinishLaunchingWithOptions:nil];
+
   // Mock some methods to force an error callback.
   [[[_mockInternalUtility stub] andReturnValue:@NO] isFacebookAppInstalled];
   NSError *URLError = [[NSError alloc] initWithDomain:FBSDKErrorDomain code:0 userInfo:nil];
-  [[_mockInternalUtility stub] appURLWithHost:OCMOCK_ANY
-                                         path:OCMOCK_ANY
-                              queryParameters:OCMOCK_ANY
-                                        error:((NSError __autoreleasing **)[OCMArg setTo:URLError])];
+  OCMStub(
+    [_mockInternalUtility appURLWithHost:OCMOCK_ANY
+                                    path:OCMOCK_ANY
+                         queryParameters:OCMOCK_ANY
+                                   error:((NSError __autoreleasing **)[OCMArg setTo:URLError])]
+  );
 
-  XCTestExpectation *expectation = [self expectationWithDescription:@"completed auth"];
+  __block BOOL handlerCalled;
   FBSDKLoginManager *manager = [FBSDKLoginManager new];
   [manager logInWithPermissions:@[@"public_profile"] fromViewController:nil handler:^(FBSDKLoginManagerLoginResult *result, NSError *error) {
-    [expectation fulfill];
+    handlerCalled = YES;
   }];
   // This makes sure that FBSDKLoginManager is retaining itself for the duration of the call
   manager = nil;
-  [self waitForExpectationsWithTimeout:5 handler:^(NSError *_Nullable error) {
-    XCTAssertNil(error);
-  }];
+  XCTAssertTrue(handlerCalled, "Should invoke completion synchronously");
+}
+
+- (void)testLoginWithSFVC
+{
+  FBSDKLoginManager *manager = [FBSDKLoginManager new];
+  [manager logInWithPermissions:@[@"public_profile"] fromViewController:nil handler:nil];
+
+  XCTAssertEqual(_testBridgeAPI.openURLWithSFVCCount, 1, "openURLWithSafariViewController should be called");
+  XCTAssertEqual(_testBridgeAPI.openURLCount, 0, "openURL should not be called");
+}
+
+- (void)testLoginWithBrowser
+{
+  FBSDKServerConfiguration *mockConfig = [OCMockObject niceMockForClass:FBSDKServerConfiguration.class];
+  OCMStub([mockConfig useSafariViewControllerForDialogName:FBSDKDialogConfigurationNameLogin]).andReturn(NO);
+  id mockConfigManagerClass = OCMClassMock(FBSDKServerConfigurationManager.class);
+  OCMStub([mockConfigManagerClass cachedServerConfiguration]).andReturn(mockConfig);
+
+  FBSDKLoginManager *manager = [FBSDKLoginManager new];
+  [manager logInWithPermissions:@[@"public_profile"] fromViewController:nil handler:nil];
+
+  XCTAssertEqual(_testBridgeAPI.openURLCount, 1, "openURL should be called");
+  XCTAssertEqual(_testBridgeAPI.openURLWithSFVCCount, 0, "openURLWithSafariViewController should not be called");
+
+  [mockConfigManagerClass stopMocking];
 }
 
 - (void)testCallingLoginWhileAnotherLoginHasNotFinishedNoOps
@@ -516,13 +654,19 @@ static NSString *const kFakeJTI = @"a jti is just any string";
   FBSDKLoginConfiguration *config = [[FBSDKLoginConfiguration alloc]
                                      initWithPermissions:@[@"public_profile", @"email"]
                                      tracking:FBSDKLoginTrackingEnabled];
+  FBSDKLoginManagerLogger *logger = [[FBSDKLoginManagerLogger alloc] initWithLoggingToken:@"123"
+                                                                                 tracking:FBSDKLoginTrackingEnabled];
 
-  NSDictionary *params = [_mockLoginManager logInParametersWithConfiguration:config serverConfiguration:nil];
+  NSDictionary *params = [_mockLoginManager logInParametersWithConfiguration:config serverConfiguration:nil logger:logger authMethod:@"sfvc_auth"];
+
   [self validateCommonLoginParameters:params];
   XCTAssertEqualObjects(params[@"response_type"], @"id_token,token_or_nonce,signed_request,graph_domain");
   XCTAssertEqualObjects(params[@"scope"], @"public_profile,email,openid");
   XCTAssertNotNil(params[@"nonce"]);
   XCTAssertNil(params[@"tp"], "Regular login should not send a tracking parameter");
+  NSDictionary *state = [FBSDKBasicUtility objectForJSONString:params[@"state"] error:nil];
+  XCTAssertEqualObjects(state[@"3_method"], @"sfvc_auth");
+  XCTAssertEqual(params[@"auth_type"], FBSDKLoginAuthTypeRerequest);
 }
 
 - (void)testLoginTrackingLimitedLoginParams
@@ -531,13 +675,19 @@ static NSString *const kFakeJTI = @"a jti is just any string";
                                      initWithPermissions:@[@"public_profile", @"email"]
                                      tracking:FBSDKLoginTrackingLimited
                                      nonce:@"some_nonce"];
+  FBSDKLoginManagerLogger *logger = [[FBSDKLoginManagerLogger alloc] initWithLoggingToken:@"123"
+                                                                                 tracking:FBSDKLoginTrackingLimited];
 
-  NSDictionary *params = [_mockLoginManager logInParametersWithConfiguration:config serverConfiguration:nil];
+  NSDictionary *params = [_mockLoginManager logInParametersWithConfiguration:config serverConfiguration:nil logger:logger authMethod:@"browser_auth"];
+
   [self validateCommonLoginParameters:params];
   XCTAssertEqualObjects(params[@"response_type"], @"id_token,graph_domain");
   XCTAssertEqualObjects(params[@"scope"], @"public_profile,email,openid");
   XCTAssertEqualObjects(params[@"nonce"], @"some_nonce");
   XCTAssertEqualObjects(params[@"tp"], @"ios_14_do_not_track");
+  NSDictionary *state = [FBSDKBasicUtility objectForJSONString:params[@"state"] error:nil];
+  XCTAssertEqualObjects(state[@"3_method"], @"browser_auth");
+  XCTAssertEqual(params[@"auth_type"], FBSDKLoginAuthTypeRerequest);
 }
 
 - (void)testLoginParamsWithNilConfiguration
@@ -550,10 +700,54 @@ static NSString *const kFakeJTI = @"a jti is just any string";
   };
   [_mockLoginManager setHandler:handler];
 
-  NSDictionary *params = [_mockLoginManager logInParametersWithConfiguration:nil serverConfiguration:nil];
+  NSDictionary *params = [_mockLoginManager logInParametersWithConfiguration:nil serverConfiguration:nil logger:nil authMethod:@"sfvc_auth"];
 
   XCTAssertNil(params);
   XCTAssert(wasCalled);
+}
+
+- (void)testLoginParamsWithNilAuthType
+{
+  FBSDKLoginConfiguration *config = [[FBSDKLoginConfiguration alloc]
+                                     initWithPermissions:@[@"public_profile", @"email"]
+                                     tracking:FBSDKLoginTrackingEnabled
+                                     messengerPageId:nil
+                                     authType:nil];
+  FBSDKLoginManagerLogger *logger = [[FBSDKLoginManagerLogger alloc] initWithLoggingToken:@"123"
+                                                                                 tracking:FBSDKLoginTrackingEnabled];
+
+  NSDictionary *params = [_mockLoginManager logInParametersWithConfiguration:config serverConfiguration:nil logger:logger authMethod:@"sfvc_auth"];
+
+  [self validateCommonLoginParameters:params];
+  XCTAssertEqualObjects(params[@"response_type"], @"id_token,token_or_nonce,signed_request,graph_domain");
+  XCTAssertEqualObjects(params[@"scope"], @"public_profile,email,openid");
+  XCTAssertNotNil(params[@"nonce"]);
+  XCTAssertNil(params[@"tp"], "Regular login should not send a tracking parameter");
+  NSDictionary *state = [FBSDKBasicUtility objectForJSONString:params[@"state"] error:nil];
+  XCTAssertEqualObjects(state[@"3_method"], @"sfvc_auth");
+  XCTAssertEqual(params[@"auth_type"], nil);
+}
+
+- (void)testLoginParamsWithExplicitlySetAuthType
+{
+  FBSDKLoginConfiguration *config = [[FBSDKLoginConfiguration alloc]
+                                     initWithPermissions:@[@"public_profile", @"email"]
+                                     tracking:FBSDKLoginTrackingEnabled
+                                     messengerPageId:nil
+                                     authType:FBSDKLoginAuthTypeReauthorize];
+  FBSDKLoginManagerLogger *logger = [[FBSDKLoginManagerLogger alloc] initWithLoggingToken:@"123"
+                                                                                 tracking:FBSDKLoginTrackingEnabled];
+
+  NSDictionary *params = [_mockLoginManager logInParametersWithConfiguration:config serverConfiguration:nil logger:logger authMethod:@"sfvc_auth"];
+
+  [self validateCommonLoginParameters:params];
+  XCTAssertEqualObjects(params[@"response_type"], @"id_token,token_or_nonce,signed_request,graph_domain");
+  XCTAssertEqualObjects(params[@"scope"], @"public_profile,email,openid");
+  XCTAssertNotNil(params[@"nonce"]);
+  XCTAssertNil(params[@"tp"], "Regular login should not send a tracking parameter");
+  NSDictionary *state = [FBSDKBasicUtility objectForJSONString:params[@"state"] error:nil];
+  XCTAssertEqualObjects(state[@"3_method"], @"sfvc_auth");
+  XCTAssertEqual(params[@"auth_type"], FBSDKLoginAuthTypeReauthorize);
 }
 
 - (void)testLogInParametersFromURL
@@ -572,12 +766,12 @@ static NSString *const kFakeJTI = @"a jti is just any string";
 
 - (void)testLogInWithURLFailWithInvalidLoginData
 {
-  XCTestExpectation *expectation = [self expectationWithDescription:self.name];
+  __block BOOL handlerCalled;
   NSURL *urlWithInvalidLoginData = [NSURL URLWithString:@"myapp://somelink/?al_applink_data=%7B%22target_url%22%3Anull%2C%22extras%22%3A%7B%22fb_login%22%3A%22invalid%22%7D%2C%22referer_app_link%22%3A%7B%22url%22%3A%22fb%3A%5C%2F%5C%2F%5C%2F%22%2C%22app_name%22%3A%22Facebook%22%7D%7D"];
   FBSDKLoginManagerLoginResultBlock handler = ^(FBSDKLoginManagerLoginResult *result, NSError *error) {
+    handlerCalled = YES;
     if (error) {
       XCTAssertNil(result);
-      [expectation fulfill];
     } else {
       XCTFail(@"Should have error");
     }
@@ -585,19 +779,17 @@ static NSString *const kFakeJTI = @"a jti is just any string";
 
   [_mockLoginManager logInWithURL:urlWithInvalidLoginData handler:handler];
 
-  [self waitForExpectationsWithTimeout:1 handler:^(NSError *_Nullable error) {
-    XCTAssertNil(error);
-  }];
+  XCTAssert(handlerCalled, @"Completion handler should be invoked synchronously");
 }
 
 - (void)testLogInWithURLFailWithNoLoginData
 {
-  XCTestExpectation *expectation = [self expectationWithDescription:self.name];
+  __block BOOL handlerCalled;
   NSURL *urlWithNoLoginData = [NSURL URLWithString:@"myapp://somelink/?al_applink_data=%7B%22target_url%22%3Anull%2C%22extras%22%3A%7B%22some_param%22%3A%22some_value%22%7D%2C%22referer_app_link%22%3A%7B%22url%22%3A%22fb%3A%5C%2F%5C%2F%5C%2F%22%2C%22app_name%22%3A%22Facebook%22%7D%7D"];
   FBSDKLoginManagerLoginResultBlock handler = ^(FBSDKLoginManagerLoginResult *result, NSError *error) {
+    handlerCalled = YES;
     if (error) {
       XCTAssertNil(result);
-      [expectation fulfill];
     } else {
       XCTFail(@"Should have error");
     }
@@ -605,9 +797,7 @@ static NSString *const kFakeJTI = @"a jti is just any string";
 
   [_mockLoginManager logInWithURL:urlWithNoLoginData handler:handler];
 
-  [self waitForExpectationsWithTimeout:1 handler:^(NSError *_Nullable error) {
-    XCTAssertNil(error);
-  }];
+  XCTAssert(handlerCalled, @"Completion handler should be invoked synchronously");
 }
 
 // MARK: Logout
@@ -640,12 +830,15 @@ static NSString *const kFakeJTI = @"a jti is just any string";
 {
   [FBSDKAccessToken setCurrentAccessToken:nil shouldDispatchNotif:NO];
 
+  __block BOOL handlerCalled;
   [_mockLoginManager reauthorizeDataAccess:[UIViewController new]
                                    handler:^(FBSDKLoginManagerLoginResult *result, NSError *error) {
+                                     handlerCalled = true;
                                      XCTAssertNil(result, "Should not have a result when reauthorizing without a current access token");
                                      XCTAssertEqual(error.domain, FBSDKLoginErrorDomain);
                                      XCTAssertEqual(error.code, FBSDKLoginErrorMissingAccessToken);
                                    }];
+  XCTAssert(handlerCalled, @"Completion handler should be invoked synchronously");
 }
 
 - (void)testReauthorizingWithAccessToken
@@ -663,6 +856,19 @@ static NSString *const kFakeJTI = @"a jti is just any string";
   XCTAssertEqualObjects(manager.configuration.requestedPermissions, NSSet.new);
   XCTAssertNotNil(manager.configuration.nonce);
   OCMVerify([manager logIn]);
+}
+
+- (void)testReauthorizingWithInvalidStartState
+{
+  FBSDKLoginManager *manager = _mockLoginManager;
+  [manager setState:FBSDKLoginManagerStateStart];
+
+  [manager reauthorizeDataAccess:[UIViewController new]
+                         handler:^(FBSDKLoginManagerLoginResult *result, NSError *error) {
+                           XCTFail("Should not actually reauthorize and call the handler in this test");
+                         }];
+
+  OCMReject([manager logIn]);
 }
 
 // MARK: Permissions
@@ -721,6 +927,116 @@ static NSString *const kFakeJTI = @"a jti is just any string";
   XCTAssertEqualObjects(recentlyDeclinedPermissions, expectedPermisssions);
 }
 
+// MARK: Reauthentication
+
+- (void)testValidateReauthenticationGraphRequestCreation
+{
+  FBSDKLoginManager *manager = _mockLoginManager;
+  TestGraphRequestConnection *connection = [TestGraphRequestConnection new];
+  TestGraphRequestConnectionFactory *factory = [TestGraphRequestConnectionFactory createWithStubbedConnection:connection];
+  FBSDKLoginManagerLoginResult *result = [[FBSDKLoginManagerLoginResult alloc] initWithToken:SampleAccessTokens.validToken authenticationToken:nil isCancelled:NO grantedPermissions:NSSet.new declinedPermissions:NSSet.new];
+
+  [manager validateReauthenticationWithGraphRequestConnectionProvider:factory withToken:result.token withResult:result];
+
+  FBSDKGraphRequest *capturedRequest = (FBSDKGraphRequest *)connection.capturedRequest;
+  XCTAssertEqualObjects(
+    capturedRequest.graphPath,
+    @"me",
+    "Should create a graph request with the expected graph path"
+  );
+  XCTAssertEqualObjects(
+    capturedRequest.tokenString,
+    SampleAccessTokens.validToken.tokenString,
+    "Should create a graph request with the expected access token string"
+  );
+  XCTAssertEqual(
+    capturedRequest.flags,
+    FBSDKGraphRequestFlagDoNotInvalidateTokenOnError
+    | FBSDKGraphRequestFlagDisableErrorRecovery,
+    "The graph request should not invalidate the token on error or disable error recovery"
+  );
+}
+
+- (void)testValidateReauthenticationCompletionWithError
+{
+  FBSDKLoginManager *manager = _mockLoginManager;
+  TestGraphRequestConnection *connection = [TestGraphRequestConnection new];
+  TestGraphRequestConnectionFactory *factory = [TestGraphRequestConnectionFactory createWithStubbedConnection:connection];
+  FBSDKLoginManagerLoginResult *loginResult = [[FBSDKLoginManagerLoginResult alloc] initWithToken:SampleAccessTokens.validToken authenticationToken:nil isCancelled:NO grantedPermissions:NSSet.new declinedPermissions:NSSet.new];
+
+  __block BOOL completionWasInvoked = NO;
+  [manager setHandler:^(FBSDKLoginManagerLoginResult *result, NSError *error) {
+    completionWasInvoked = YES;
+    XCTAssertNotNil(error);
+    XCTAssertNil(result);
+  }];
+
+  [manager validateReauthenticationWithGraphRequestConnectionProvider:factory withToken:SampleAccessTokens.validToken withResult:loginResult];
+  connection.capturedCompletion(nil, nil, [FBSDKError unknownErrorWithMessage:@"test"]);
+
+  XCTAssertTrue(completionWasInvoked);
+}
+
+- (void)testValidateReauthenticationCompletionWithMatchingUserID
+{
+  FBSDKLoginManager *manager = _mockLoginManager;
+  TestGraphRequestConnection *connection = [TestGraphRequestConnection new];
+  TestGraphRequestConnectionFactory *factory = [TestGraphRequestConnectionFactory createWithStubbedConnection:connection];
+  FBSDKLoginManagerLoginResult *loginResult = [[FBSDKLoginManagerLoginResult alloc] initWithToken:SampleAccessTokens.validToken authenticationToken:nil isCancelled:NO grantedPermissions:NSSet.new declinedPermissions:NSSet.new];
+
+  __block BOOL completionWasInvoked = NO;
+  [manager setHandler:^(FBSDKLoginManagerLoginResult *result, NSError *error) {
+    completionWasInvoked = YES;
+    XCTAssertNil(error);
+    XCTAssertEqualObjects(result, loginResult);
+  }];
+
+  [manager validateReauthenticationWithGraphRequestConnectionProvider:factory withToken:SampleAccessTokens.validToken withResult:loginResult];
+  connection.capturedCompletion(nil, @{@"id" : SampleAccessTokens.validToken.userID}, nil);
+
+  XCTAssertTrue(completionWasInvoked);
+}
+
+- (void)testValidateReauthenticationCompletionWithMismatchedUserID
+{
+  FBSDKLoginManager *manager = _mockLoginManager;
+  TestGraphRequestConnection *connection = [TestGraphRequestConnection new];
+  TestGraphRequestConnectionFactory *factory = [TestGraphRequestConnectionFactory createWithStubbedConnection:connection];
+  FBSDKLoginManagerLoginResult *loginResult = [[FBSDKLoginManagerLoginResult alloc] initWithToken:SampleAccessTokens.validToken authenticationToken:nil isCancelled:NO grantedPermissions:NSSet.new declinedPermissions:NSSet.new];
+
+  __block BOOL completionWasInvoked = NO;
+  [manager setHandler:^(FBSDKLoginManagerLoginResult *result, NSError *error) {
+    completionWasInvoked = YES;
+    XCTAssertNotNil(error);
+    XCTAssertNil(result);
+  }];
+
+  [manager validateReauthenticationWithGraphRequestConnectionProvider:factory withToken:SampleAccessTokens.validToken withResult:loginResult];
+  connection.capturedCompletion(nil, @{@"id" : @"456"}, nil);
+
+  XCTAssertTrue(completionWasInvoked);
+}
+
+// MARK: isPerformingLogin
+
+- (void)testIsPerformingLoginWhenIdle
+{
+  [((FBSDKLoginManager *)_mockLoginManager) setState:(FBSDKLoginManagerState)FBSDKLoginManagerStateIdle];
+  XCTAssertFalse([_mockLoginManager isPerformingLogin]);
+}
+
+- (void)testIsPerformingLoginWhenStarted
+{
+  [((FBSDKLoginManager *)_mockLoginManager) setState:(FBSDKLoginManagerState)FBSDKLoginManagerStateStart];
+  XCTAssertFalse([_mockLoginManager isPerformingLogin]);
+}
+
+- (void)testIsPerformingLoginWhenPerformingLogin
+{
+  [((FBSDKLoginManager *)_mockLoginManager) setState:(FBSDKLoginManagerState)FBSDKLoginManagerStatePerformingLogin];
+  XCTAssert([_mockLoginManager isPerformingLogin]);
+}
+
 // MARK: Helpers
 
 - (FBSDKAccessToken *)sampleAccessToken
@@ -739,17 +1055,23 @@ static NSString *const kFakeJTI = @"a jti is just any string";
 - (void)validateCommonLoginParameters:(NSDictionary *)params
 {
   XCTAssertEqualObjects(params[@"client_id"], kFakeAppID);
-  XCTAssertEqualObjects(params[@"redirect_uri"], @"fbconnect://success");
   XCTAssertEqualObjects(params[@"display"], @"touch");
   XCTAssertEqualObjects(params[@"sdk"], @"ios");
   XCTAssertEqualObjects(params[@"return_scopes"], @"true");
-  XCTAssertEqual(params[@"auth_type"], FBSDKLoginAuthTypeRerequest);
   XCTAssertEqualObjects(params[@"fbapp_pres"], @0);
   XCTAssertEqualObjects(params[@"ies"], [FBSDKSettings isAutoLogAppEventsEnabled] ? @1 : @0);
+  XCTAssertNotNil(params[@"e2e"]);
+
+  NSDictionary *state = [FBSDKBasicUtility objectForJSONString:params[@"state"] error:nil];
+  XCTAssertNotNil(state[@"challenge"]);
+  XCTAssertNotNil(state[@"0_auth_logger_id"]);
 
   long long cbt = [params[@"cbt"] longLongValue];
   long long currentMilliseconds = round(1000 * [NSDate date].timeIntervalSince1970);
   XCTAssertEqualWithAccuracy(cbt, currentMilliseconds, 500);
+
+  NSString *expectedRedirectUri = [NSString stringWithFormat:@"fb%@://authorize/", kFakeAppID];
+  XCTAssertEqualObjects(params[@"redirect_uri"], expectedRedirectUri);
 }
 
 - (void)validateAuthenticationToken:(FBSDKAuthenticationToken *)authToken
@@ -764,6 +1086,9 @@ static NSString *const kFakeJTI = @"a jti is just any string";
 {
   XCTAssertNotNil(profile, @"user profile should be updated");
   XCTAssertEqualObjects(profile.name, _claims[@"name"], @"failed to parse user name");
+  XCTAssertEqualObjects(profile.firstName, _claims[@"given_name"], @"failed to parse user first name");
+  XCTAssertEqualObjects(profile.middleName, _claims[@"middle_name"], @"failed to parse user middle name");
+  XCTAssertEqualObjects(profile.lastName, _claims[@"family_name"], @"failed to parse user last name");
   XCTAssertEqualObjects(profile.userID, _claims[@"sub"], @"failed to parse userID");
   XCTAssertEqualObjects(profile.imageURL.absoluteString, _claims[@"picture"], @"failed to parse user profile picture");
   XCTAssertEqualObjects(profile.email, _claims[@"email"], @"failed to parse user email");
@@ -779,6 +1104,22 @@ static NSString *const kFakeJTI = @"a jti is just any string";
     profile.ageRange,
     [FBSDKUserAgeRange ageRangeFromDictionary:_claims[@"user_age_range"]],
     @"failed to parse user age range"
+  );
+  XCTAssertEqualObjects(
+    profile.hometown,
+    [FBSDKLocation locationFromDictionary:_claims[@"user_hometown"]],
+    @"failed to parse user hometown"
+  );
+  XCTAssertEqualObjects(
+    profile.location,
+    [FBSDKLocation locationFromDictionary:_claims[@"user_location"]],
+    @"failed to parse user location"
+  );
+  XCTAssertEqualObjects(profile.gender, _claims[@"user_gender"], @"failed to parse user gender");
+  XCTAssertEqualObjects(
+    profile.linkURL,
+    [NSURL URLWithString:_claims[@"user_link"]],
+    @"failed to parse user link"
   );
 }
 

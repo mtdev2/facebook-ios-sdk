@@ -17,26 +17,51 @@
 // CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 import FBSDKCoreKit
+import TestTools
 import XCTest
 
 class CrashObserversTest: XCTestCase {
 
+  var requestProvider: TestGraphRequestFactory! // swiftlint:disable:this implicitly_unwrapped_optional
+  var crashObserver: CrashObserver! // swiftlint:disable:this implicitly_unwrapped_optional
+  var settings: TestSettings! // swiftlint:disable:this implicitly_unwrapped_optional
+  let featureManager = TestFeatureManager()
+
+  override func setUp() {
+    super.setUp()
+    requestProvider = TestGraphRequestFactory()
+    settings = TestSettings()
+    crashObserver = CrashObserver(
+      featureChecker: featureManager,
+      graphRequestProvider: requestProvider,
+      settings: settings
+    )
+  }
+
+  func testDefaultCrashObserverSettings() {
+     XCTAssertTrue(
+       CrashObserver().settings is Settings,
+       "Should use the shared settings instance by default"
+     )
+   }
+
+  func testCreatingWithCustomSettings() {
+    XCTAssertTrue(
+      crashObserver.settings is TestSettings,
+      "Should be able to create with custom settings"
+    )
+  }
+
   func testDidReceiveCrashLogs() {
-    let featureManagerProvider = TestFeatureManagerProvider.create(withStubbedFeatureManager: TestFeatureManager.self)
-
-    let crashObserver = CrashObserver(featureManagerProvider: featureManagerProvider)
-
     crashObserver.didReceiveCrashLogs([])
-    XCTAssertEqual(TestFeatureManager.capturedFeatures, [])
-
-    featureManagerProvider.stubbedFeatureManager?.check(SDKFeature.crashShield, completionBlock: nil)
+    XCTAssertEqual(featureManager.capturedFeatures, [])
 
     let processedCrashLogs = CrashObserversTest.getCrashLogs()
 
     crashObserver.didReceiveCrashLogs(processedCrashLogs)
 
     XCTAssertTrue(
-      TestFeatureManager.capturedFeatures.contains(SDKFeature.crashShield),
+      featureManager.capturedFeatures.contains(SDKFeature.crashShield),
       "Receiving crash logs should check to see if the crash shield feature is enabled"
     )
   }

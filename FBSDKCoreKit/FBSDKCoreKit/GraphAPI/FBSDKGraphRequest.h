@@ -21,11 +21,9 @@
 #import "FBSDKGraphRequestProtocol.h"
 #import "FBSDKGraphRequestHTTPMethod.h"
 
-NS_ASSUME_NONNULL_BEGIN
-
-@class FBSDKAccessToken;
 @protocol FBSDKGraphRequestConnecting;
 
+NS_ASSUME_NONNULL_BEGIN
 /**
   Represents a request to the Facebook Graph API.
 
@@ -141,7 +139,14 @@ NS_SWIFT_NAME(setGraphErrorRecovery(disabled:));
   Starts a connection to the Graph API.
  @param handler The handler block to call when the request completes.
  */
-- (id<FBSDKGraphRequestConnecting>)startWithCompletionHandler:(nullable FBSDKGraphRequestBlock)handler;
+- (id<FBSDKGraphRequestConnecting>)startWithCompletionHandler:(nullable FBSDKGraphRequestBlock)handler
+DEPRECATED_MSG_ATTRIBUTE("This method is deprecated and will be removed in the next major release. Please use `startWithCompletion:` instead`");
+
+/**
+  Starts a connection to the Graph API.
+ @param completion The handler block to call when the request completes.
+ */
+- (id<FBSDKGraphRequestConnecting>)startWithCompletion:(nullable FBSDKGraphRequestCompletion)completion;
 
 @end
 

@@ -22,11 +22,15 @@
 
  #import "FBSDKLikeDialog.h"
 
+ #import "FBSDKCoreKitImport.h"
+
  #ifdef FBSDKCOCOAPODS
   #import <FBSDKCoreKit/FBSDKCoreKit+Internal.h>
  #else
   #import "FBSDKCoreKit+Internal.h"
  #endif
+
+ #import "FBSDKCoreKitBasicsImportForShareKit.h"
  #import "FBSDKShareConstants.h"
  #import "FBSDKShareDefines.h"
 
@@ -50,7 +54,7 @@
                       objectType:(FBSDKLikeObjectType)objectType
                         delegate:(id<FBSDKLikeDialogDelegate>)delegate
 {
-  FBSDKLikeDialog *dialog = [[self alloc] init];
+  FBSDKLikeDialog *dialog = [self new];
   dialog.objectID = objectID;
   dialog.objectType = objectType;
   dialog.delegate = delegate;
@@ -80,7 +84,7 @@
     return NO;
   }
 
-  NSMutableDictionary *parameters = [[NSMutableDictionary alloc] init];
+  NSMutableDictionary *parameters = [NSMutableDictionary new];
   [FBSDKTypeUtility dictionary:parameters setObject:self.objectID forKey:@"object_id"];
   [FBSDKTypeUtility dictionary:parameters
                      setObject:NSStringFromFBSDKLikeObjectType(self.objectType)
@@ -150,7 +154,7 @@
 {
   FBSDKServerConfiguration *configuration = [FBSDKServerConfigurationManager cachedServerConfiguration];
   BOOL useNativeDialog = [configuration useNativeDialogForDialogName:FBSDKDialogConfigurationNameLike];
-  return (useNativeDialog && [FBSDKInternalUtility isFacebookAppInstalled]);
+  return (useNativeDialog && [FBSDKInternalUtility.sharedUtility isFacebookAppInstalled]);
 }
 
 - (void)_handleCompletionWithDialogResults:(NSDictionary *)results error:(NSError *)error

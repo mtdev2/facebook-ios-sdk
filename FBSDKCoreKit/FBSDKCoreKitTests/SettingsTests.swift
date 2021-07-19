@@ -152,7 +152,7 @@ class SettingsTests: XCTestCase {
   func testGettingPersistedFacebookAdvertiserTrackingStatus() {
     let key = "com.facebook.sdk:FBSDKSettingsAdvertisingTrackingStatus"
     store.set(
-      NSNumber(value: AppEventsUtility.AdvertisingTrackingStatus.allowed.rawValue),
+      NSNumber(value: AdvertisingTrackingStatus.allowed.rawValue),
       forKey: key
     )
     XCTAssertEqual(
@@ -174,7 +174,7 @@ class SettingsTests: XCTestCase {
   func testGettingCachedFacebookAdvertiserTrackingStatus() {
     let key = "com.facebook.sdk:FBSDKSettingsAdvertisingTrackingStatus"
     store.set(
-      NSNumber(value: AppEventsUtility.AdvertisingTrackingStatus.allowed.rawValue),
+      NSNumber(value: AdvertisingTrackingStatus.allowed.rawValue),
       forKey: key
     )
     XCTAssertEqual(
@@ -223,6 +223,19 @@ class SettingsTests: XCTestCase {
     XCTAssertNil(
       store.object(forKey: "com.facebook.sdk:FBSDKSettingsSetAdvertiserTrackingEnabledTimestamp"),
       "Should not capture the time the status is set to unspecified"
+    )
+  }
+
+  // MARK: - Logging behaviors
+
+  func testLoggingBehaviors() {
+    let behaviors = Set([LoggingBehavior.accessTokens, .appEvents])
+    Settings.loggingBehaviors = behaviors
+
+    XCTAssertEqual(
+      Settings.loggingBehaviors,
+      behaviors,
+      "Should be able to set and retrieve logging behaviors"
     )
   }
 }

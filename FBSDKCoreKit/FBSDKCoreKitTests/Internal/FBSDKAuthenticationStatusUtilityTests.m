@@ -20,7 +20,6 @@
 
 @import TestTools;
 #import "FBSDKCoreKitTests-Swift.h"
-#import "FBSDKTestCase.h"
 
 @interface FBSDKProfile (Testing)
 
@@ -36,8 +35,7 @@
 
 @end
 
-@interface FBSDKAuthenticationStatusUtilityTests : FBSDKTestCase
-
+@interface FBSDKAuthenticationStatusUtilityTests : XCTestCase
 @end
 
 @implementation FBSDKAuthenticationStatusUtilityTests
@@ -71,7 +69,7 @@
   XCTAssertEqualObjects(url.host, @"m.facebook.com");
   XCTAssertEqualObjects(url.path, @"/platform/oidc/status");
 
-  NSDictionary *params = [FBSDKInternalUtility parametersFromFBURL:url];
+  NSDictionary *params = [FBSDKInternalUtility.sharedUtility parametersFromFBURL:url];
   XCTAssertEqualObjects(params[@"id_token"], FBSDKAuthenticationToken.currentAuthenticationToken.tokenString, @"Incorrect ID token parameter in request url");
 }
 

@@ -18,37 +18,71 @@
 
 #import "FBSDKAppEventsAtePublisher.h"
 
+#if FBSDK_SWIFT_PACKAGE
+ #import "FBSDKGraphRequestFlags.h"
+ #import "FBSDKGraphRequestHTTPMethod.h"
+#else
+ #import <FBSDKCoreKit/FBSDKGraphRequestFlags.h>
+ #import <FBSDKCoreKit/FBSDKGraphRequestHTTPMethod.h>
+#endif
+
 #import "FBSDKAppEventsDeviceInfo.h"
-#import "FBSDKInternalUtility.h"
+#import "FBSDKCoreKitBasicsImport.h"
+#import "FBSDKDataPersisting.h"
+#import "FBSDKGraphRequestConnecting.h"
+#import "FBSDKGraphRequestProtocol.h"
+#import "FBSDKGraphRequestProviding.h"
+#import "FBSDKInternalUtility+Internal.h"
+#import "FBSDKLogger.h"
+#import "FBSDKSettingsProtocol.h"
+
+@interface FBSDKAppEventsAtePublisher ()
+
+@property (nullable, nonatomic) id<FBSDKGraphRequestProviding> graphRequestFactory;
+@property (nullable, nonatomic) id<FBSDKSettings> settings;
+@property (nullable, nonatomic) id<FBSDKDataPersisting> store;
+@property (nonatomic) BOOL isProcessing;
+
+@end
 
 @implementation FBSDKAppEventsAtePublisher
 
 - (nullable instancetype)initWithAppIdentifier:(NSString *)appIdentifier
+                           graphRequestFactory:(id<FBSDKGraphRequestProviding>)graphRequestFactory
+                                      settings:(id<FBSDKSettings>)settings
+                                         store:(id<FBSDKDataPersisting>)store
 {
   if ((self = [self init])) {
-    NSString *identifier = [FBSDKTypeUtility stringValue:appIdentifier];
+    NSString *identifier = [FBSDKTypeUtility coercedToStringValue:appIdentifier];
     if (identifier.length == 0) {
       [FBSDKLogger singleShotLogEntry:FBSDKLoggingBehaviorDeveloperErrors logEntry:@"Missing [FBSDKAppEvents appID] for [FBSDKAppEvents publishATE:]"];
       return nil;
     }
     _appIdentifier = identifier;
+    _graphRequestFactory = graphRequestFactory;
+    _settings = settings;
+    _store = store;
   }
   return self;
 }
 
 - (void)publishATE
 {
+  if (self.isProcessing) {
+    return;
+  }
+  self.isProcessing = YES;
   NSString *lastATEPingString = [NSString stringWithFormat:@"com.facebook.sdk:lastATEPing%@", self.appIdentifier];
-  NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
-  id lastPublishDate = [defaults objectForKey:lastATEPingString];
+  id lastPublishDate = [self.store objectForKey:lastATEPingString];
   if ([lastPublishDate isKindOfClass:[NSDate class]] && [(NSDate *)lastPublishDate timeIntervalSinceNow] * -1 < 24 * 60 * 60) {
+    self.isProcessing = NO;
     return;
   }
 
   NSMutableDictionary *parameters = [NSMutableDictionary dictionary];
   [FBSDKTypeUtility dictionary:parameters setObject:@"CUSTOM_APP_EVENTS" forKey:@"event"];
 
-  NSOperatingSystemVersion operatingSystemVersion = [FBSDKInternalUtility operatingSystemVersion];
+  NSOperatingSystemVersion operatingSystemVersion = [FBSDKInternalUtility.sharedUtility operatingSystemVersion];
   NSString *osVersion = [NSString stringWithFormat:@"%ti.%ti.%ti",
                          operatingSystemVersion.majorVersion,
                          operatingSystemVersion.minorVersion,
@@ -57,7 +91,7 @@
   NSArray *event = @[
     @{
       @"_eventName" : @"fb_mobile_ate_status",
-      @"ate_status" : @([FBSDKSettings advertisingTrackingStatus]).stringValue,
+      @"ate_status" : @(self.settings.advertisingTrackingStatus).stringValue,
       @"os_version" : osVersion,
     }
   ];
@@ -66,16 +100,22 @@
   [FBSDKAppEventsDeviceInfo extendDictionaryWithDeviceInfo:parameters];
 
   NSString *path = [NSString stringWithFormat:@"%@/activities", self.appIdentifier];
-  FBSDKGraphRequest *request = [[FBSDKGraphRequest alloc] initWithGraphPath:path
-                                                                 parameters:parameters
-                                                                tokenString:nil
-                                                                 HTTPMethod:FBSDKHTTPMethodPOST
-                                                                      flags:FBSDKGraphRequestFlagDoNotInvalidateTokenOnError | FBSDKGraphRequestFlagDisableErrorRecovery];
-  [request startWithCompletionHandler:^(FBSDKGraphRequestConnection *connection, id result, NSError *error) {
+  id<FBSDKGraphRequest> request = [self.graphRequestFactory createGraphRequestWithGraphPath:path
+                                                                                 parameters:parameters
+                                                                                tokenString:nil
+                                                                                 HTTPMethod:FBSDKHTTPMethodPOST
+                                                                                      flags:FBSDKGraphRequestFlagDoNotInvalidateTokenOnError | FBSDKGraphRequestFlagDisableErrorRecovery];
+  __block id<FBSDKDataPersisting> weakStore = self.store;
+  [request startWithCompletion:^(id<FBSDKGraphRequestConnecting> connection, id result, NSError *error) {
     if (!error) {
-      [defaults setObject:[NSDate date] forKey:lastATEPingString];
+      [weakStore setObject:[NSDate date] forKey:lastATEPingString];
     }
+    self.isProcessing = NO;
   }];
+
+#if FBSDKTEST
+  self.isProcessing = NO;
+#endif
 }
 
 @end
