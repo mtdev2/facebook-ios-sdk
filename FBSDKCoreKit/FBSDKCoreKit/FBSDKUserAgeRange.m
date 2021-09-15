@@ -18,7 +18,8 @@
 
 #import "FBSDKUserAgeRange.h"
 
-#import "FBSDKCoreKit+Internal.h"
+#import "FBSDKCoreKitBasicsImport.h"
+#import "FBSDKMath.h"
 
 NSString *const FBSDKUserAgeRangeMinCodingKey = @"FBSDKUserAgeRangeMinCodingKey";
 NSString *const FBSDKUserAgeRangeMaxCodingKey = @"FBSDKUserAgeRangeMaxCodingKey";
@@ -36,7 +37,7 @@ NSString *const FBSDKUserAgeRangeMaxCodingKey = @"FBSDKUserAgeRangeMaxCodingKey"
   return self;
 }
 
-+ (instancetype)ageRangeFromDictionary:(NSDictionary *)dictionary
++ (instancetype)ageRangeFromDictionary:(NSDictionary<NSString *, id> *)dictionary
 {
   if (![FBSDKTypeUtility dictionaryValue:dictionary]) {
     return nil;
@@ -71,7 +72,7 @@ NSString *const FBSDKUserAgeRangeMaxCodingKey = @"FBSDKUserAgeRangeMaxCodingKey"
   if (self == object) {
     return YES;
   }
-  if (![object isKindOfClass:[FBSDKUserAgeRange class]]) {
+  if (![object isKindOfClass:FBSDKUserAgeRange.class]) {
     return NO;
   }
   return [self isEqualToUserAgeRange:object];

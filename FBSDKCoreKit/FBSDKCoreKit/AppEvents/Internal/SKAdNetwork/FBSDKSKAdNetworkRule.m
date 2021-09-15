@@ -22,7 +22,7 @@
 
  #import "FBSDKSKAdNetworkRule.h"
 
- #import "FBSDKCoreKit+Internal.h"
+ #import "FBSDKCoreKitBasicsImport.h"
 
 @implementation FBSDKSKAdNetworkRule
 
@@ -45,7 +45,7 @@
 }
 
 - (BOOL)isMatchedWithRecordedEvents:(NSSet<NSString *> *)recordedEvents
-                     recordedValues:(NSDictionary<NSString *, NSDictionary *> *)recordedValues
+                     recordedValues:(NSDictionary<NSString *, NSDictionary<NSString *, id> *> *)recordedValues
 {
   for (FBSDKSKAdNetworkEvent *event in self.events) {
     // Check if event name matches

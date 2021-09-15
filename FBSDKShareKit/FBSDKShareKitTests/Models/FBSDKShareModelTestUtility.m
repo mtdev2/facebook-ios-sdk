@@ -34,7 +34,7 @@
 
 + (NSURL *)fileURL
 {
-  return [[NSFileManager defaultManager] URLsForDirectory:NSDocumentDirectory inDomains:NSUserDomainMask].lastObject;
+  return [NSFileManager.defaultManager URLsForDirectory:NSDocumentDirectory inDomains:NSUserDomainMask].lastObject;
 }
 
 + (FBSDKShareLinkContent *)linkContent
@@ -46,7 +46,7 @@
 
 + (FBSDKShareLinkContent *)linkContentWithoutQuote
 {
-  FBSDKShareLinkContent *linkContent = [[FBSDKShareLinkContent alloc] init];
+  FBSDKShareLinkContent *linkContent = [FBSDKShareLinkContent new];
   linkContent.contentURL = [self contentURL];
   linkContent.hashtag = [self hashtag];
   linkContent.peopleIDs = [self peopleIDs];
@@ -77,7 +77,7 @@
 
 + (FBSDKSharePhotoContent *)photoContent
 {
-  FBSDKSharePhotoContent *content = [[FBSDKSharePhotoContent alloc] init];
+  FBSDKSharePhotoContent *content = [FBSDKSharePhotoContent new];
   content.contentURL = [self contentURL];
   content.hashtag = [self hashtag];
   content.peopleIDs = [self peopleIDs];
@@ -89,7 +89,7 @@
 
 + (FBSDKSharePhotoContent *)photoContentWithFileURLs
 {
-  FBSDKSharePhotoContent *const content = [[FBSDKSharePhotoContent alloc] init];
+  FBSDKSharePhotoContent *const content = [FBSDKSharePhotoContent new];
   content.contentURL = [self contentURL];
   content.hashtag = [self hashtag];
   content.peopleIDs = [self peopleIDs];
@@ -101,7 +101,7 @@
 
 + (FBSDKSharePhotoContent *)photoContentWithImages
 {
-  FBSDKSharePhotoContent *content = [[FBSDKSharePhotoContent alloc] init];
+  FBSDKSharePhotoContent *content = [FBSDKSharePhotoContent new];
   content.contentURL = [self contentURL];
   content.hashtag = [self hashtag];
   content.peopleIDs = [self peopleIDs];
@@ -213,7 +213,7 @@
 
 + (FBSDKShareVideoContent *)videoContentWithoutPreviewPhoto
 {
-  FBSDKShareVideoContent *content = [[FBSDKShareVideoContent alloc] init];
+  FBSDKShareVideoContent *content = [FBSDKShareVideoContent new];
   content.contentURL = [self contentURL];
   content.hashtag = [self hashtag];
   content.peopleIDs = [self peopleIDs];
@@ -225,7 +225,7 @@
 
 + (FBSDKShareVideoContent *)videoContentWithPreviewPhoto
 {
-  FBSDKShareVideoContent *content = [[FBSDKShareVideoContent alloc] init];
+  FBSDKShareVideoContent *content = [FBSDKShareVideoContent new];
   content.contentURL = [self contentURL];
   content.hashtag = [self hashtag];
   content.peopleIDs = [self peopleIDs];
@@ -286,13 +286,13 @@
 {
   UIGraphicsBeginImageContext(CGSizeMake(10.0, 10.0));
   CGContextRef context = UIGraphicsGetCurrentContext();
-  [[UIColor redColor] setFill];
+  [UIColor.redColor setFill];
   CGContextFillRect(context, CGRectMake(0.0, 0.0, 5.0, 5.0));
-  [[UIColor greenColor] setFill];
+  [UIColor.greenColor setFill];
   CGContextFillRect(context, CGRectMake(5.0, 0.0, 5.0, 5.0));
-  [[UIColor blueColor] setFill];
+  [UIColor.blueColor setFill];
   CGContextFillRect(context, CGRectMake(5.0, 5.0, 5.0, 5.0));
-  [[UIColor yellowColor] setFill];
+  [UIColor.yellowColor setFill];
   CGContextFillRect(context, CGRectMake(0.0, 5.0, 5.0, 5.0));
   CGImageRef imageRef = CGBitmapContextCreateImage(context);
   UIGraphicsEndImageContext();

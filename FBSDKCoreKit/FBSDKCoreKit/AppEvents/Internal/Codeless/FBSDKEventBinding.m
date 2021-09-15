@@ -22,10 +22,10 @@
 
  #import "FBSDKEventBinding.h"
 
- #import "FBSDKAppEvents.h"
- #import "FBSDKCodelessParameterComponent.h"
  #import "FBSDKCodelessPathComponent.h"
- #import "FBSDKInternalUtility.h"
+ #import "FBSDKCoreKitBasicsImport.h"
+ #import "FBSDKEventLogging.h"
+ #import "FBSDKInternalUtility+Internal.h"
  #import "FBSDKSwizzler.h"
  #import "FBSDKUtility.h"
  #import "FBSDKViewHierarchy.h"
@@ -35,6 +35,12 @@
  #define CODELESS_PATH_TYPE_RELATIVE  @"relative"
  #define CODELESS_CODELESS_EVENT_KEY  @"_is_fb_codeless"
  #define PARAMETER_NAME_PRICE          @"_valueToSum"
+
+@interface FBSDKEventBinding ()
+
+@property (nonnull, nonatomic) id<FBSDKEventLogging> eventLogger;
+
+@end
 
 @implementation FBSDKEventBinding
 
@@ -55,9 +61,12 @@ static id<FBSDKNumberParsing> _numberParser;
   _numberParser = [[FBSDKAppEventsNumberParser alloc] initWithLocale:NSLocale.currentLocale];
 }
 
-- (FBSDKEventBinding *)initWithJSON:(NSDictionary *)dict
+- (FBSDKEventBinding *)initWithJSON:(NSDictionary<NSString *, id> *)dict
+                        eventLogger:(id<FBSDKEventLogging>)eventLogger
 {
   if ((self = [super init])) {
+    _eventLogger = eventLogger;
+
     _eventName = [dict[CODELESS_MAPPING_EVENT_NAME_KEY] copy];
     _eventType = [dict[CODELESS_MAPPING_EVENT_TYPE_KEY] copy];
     _appVersion = [dict[CODELESS_MAPPING_APP_VERSION_KEY] copy];
@@ -65,7 +74,7 @@ static id<FBSDKNumberParsing> _numberParser;
 
     NSArray *pathComponents = dict[CODELESS_MAPPING_PATH_KEY];
     NSMutableArray *mut = [NSMutableArray array];
-    for (NSDictionary *info in pathComponents) {
+    for (NSDictionary<NSString *, id> *info in pathComponents) {
       FBSDKCodelessPathComponent *component = [[FBSDKCodelessPathComponent alloc] initWithJSON:info];
       [FBSDKTypeUtility array:mut addObject:component];
     }
@@ -73,7 +82,7 @@ static id<FBSDKNumberParsing> _numberParser;
 
     NSArray *parameters = dict[CODELESS_MAPPING_PARAMETERS_KEY];
     mut = [NSMutableArray array];
-    for (NSDictionary *info in parameters) {
+    for (NSDictionary<NSString *, id> *info in parameters) {
       FBSDKCodelessParameterComponent *component = [[FBSDKCodelessParameterComponent alloc] initWithJSON:info];
       [FBSDKTypeUtility array:mut addObject:component];
     }
@@ -84,8 +93,8 @@ static id<FBSDKNumberParsing> _numberParser;
 
 - (void)trackEvent:(id)sender
 {
-  UIView *sourceView = [sender isKindOfClass:[UIView class]] ? (UIView *)sender : nil;
-  NSMutableDictionary *params = [NSMutableDictionary dictionary];
+  UIView *sourceView = [sender isKindOfClass:UIView.class] ? (UIView *)sender : nil;
+  NSMutableDictionary<NSString *, id> *params = [NSMutableDictionary dictionary];
   [FBSDKTypeUtility dictionary:params setObject:@"1" forKey:CODELESS_CODELESS_EVENT_KEY];
   for (FBSDKCodelessParameterComponent *component in self.parameters) {
     NSString *text = component.value;
@@ -104,7 +113,7 @@ static id<FBSDKNumberParsing> _numberParser;
     }
   }
 
-  [FBSDKAppEvents logEvent:_eventName parameters:[params copy]];
+  [self.eventLogger logEvent:_eventName parameters:[params copy]];
 }
 
 + (BOOL)matchAnyView:(NSArray *)views
@@ -121,7 +130,10 @@ static id<FBSDKNumberParsing> _numberParser;
 + (BOOL)  match:(NSObject *)view
   pathComponent:(FBSDKCodelessPathComponent *)component
 {
-  NSString *className = NSStringFromClass([view class]);
+  if (!view) {
+    return NO;
+  }
+  NSString *className = NSStringFromClass(view.class);
   if (![className isEqualToString:component.className]) {
     return NO;
   }
@@ -151,7 +163,7 @@ static id<FBSDKNumberParsing> _numberParser;
   }
 
   if ((component.matchBitmask & FBSDKCodelessMatchBitmaskFieldTag) > 0
-      && [view isKindOfClass:[UIView class]]
+      && [view isKindOfClass:UIView.class]
       && component.tag != ((UIView *)view).tag) {
     return NO;
   }
@@ -248,7 +260,7 @@ static id<FBSDKNumberParsing> _numberParser;
   if (parent) {
     children = [FBSDKViewHierarchy getChildren:parent];
   } else {
-    UIWindow *window = [UIApplication sharedApplication].delegate.window;
+    UIWindow *window = [FBSDKInternalUtility.sharedUtility findWindow];
     if (window) {
       children = @[window];
     } else {

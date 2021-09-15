@@ -29,10 +29,11 @@
 #import <Foundation/Foundation.h>
 #import <UIKit/UIKit.h>
 
-#import "FBSDKAppEvents+Internal.h"
+#import "FBSDKAppEventsUtility.h"
+#import "FBSDKCoreKitBasicsImport.h"
 #import "FBSDKDynamicFrameworkLoader.h"
-#import "FBSDKInternalUtility.h"
-#import "FBSDKUtility.h"
+#import "FBSDKInternalUtility+Internal.h"
+#import "FBSDKSettings+Internal.h"
 
 #define FB_ARRAY_COUNT(x) sizeof(x) / sizeof(x[0])
 
@@ -41,39 +42,44 @@ static const u_int FB_GROUP1_RECHECK_DURATION = 30 * 60; // seconds
 // Apple reports storage in binary gigabytes (1024^3) in their About menus, etc.
 static const u_int FB_GIGABYTE = 1024 * 1024 * 1024; // bytes
 
+@interface FBSDKAppEventsDeviceInfo ()
+
+// Ephemeral data, may change during the lifetime of an app.  We collect them in different
+// 'group' frequencies - group1 may gets collected once every 30 minutes.
+
+// group1
+@property (nonatomic) NSString *carrierName;
+@property (nonatomic) NSString *timeZoneAbbrev;
+@property (nonatomic) unsigned long long remainingDiskSpaceGB;
+@property (nonatomic) NSString *timeZoneName;
+
+// Persistent data, but we maintain it to make rebuilding the device info as fast as possible.
+@property (nonatomic) NSString *bundleIdentifier;
+@property (nonatomic) NSString *longVersion;
+@property (nonatomic) NSString *shortVersion;
+@property (nonatomic) NSString *sysVersion;
+@property (nonatomic) NSString *machine;
+@property (nonatomic) NSString *language;
+@property (nonatomic) unsigned long long totalDiskSpaceGB;
+@property (nonatomic) unsigned long long coreCount;
+@property (nonatomic) CGFloat width;
+@property (nonatomic) CGFloat height;
+@property (nonatomic) CGFloat density;
+
+// Other state
+@property (nonatomic) long lastGroup1CheckTime;
+@property (nonatomic) BOOL isEncodingDirty;
+
+@end
+
 @implementation FBSDKAppEventsDeviceInfo
 {
-  // Ephemeral data, may change during the lifetime of an app.  We collect them in different
-  // 'group' frequencies - group1 may gets collected once every 30 minutes.
-
-  // group1
-  NSString *_carrierName;
-  NSString *_timeZoneAbbrev;
-  unsigned long long _remainingDiskSpaceGB;
-  NSString *_timeZoneName;
-
-  // Persistent data, but we maintain it to make rebuilding the device info as fast as possible.
-  NSString *_bundleIdentifier;
-  NSString *_longVersion;
-  NSString *_shortVersion;
-  NSString *_sysVersion;
-  NSString *_machine;
-  NSString *_language;
-  unsigned long long _totalDiskSpaceGB;
-  unsigned long long _coreCount;
-  CGFloat _width;
-  CGFloat _height;
-  CGFloat _density;
-
-  // Other state
-  long _lastGroup1CheckTime;
-  BOOL _isEncodingDirty;
   NSString *_encodedDeviceInfo;
 }
 
 #pragma mark - Public Methods
 
-+ (void)extendDictionaryWithDeviceInfo:(NSMutableDictionary *)dictionary
++ (void)extendDictionaryWithDeviceInfo:(NSMutableDictionary<NSString *, id> *)dictionary
 {
   [FBSDKTypeUtility dictionary:dictionary setObject:[[self sharedDeviceInfo] encodedDeviceInfo] forKey:@"extinfo"];
 }
@@ -82,7 +88,7 @@ static const u_int FB_GIGABYTE = 1024 * 1024 * 1024; // bytes
 
 + (void)initialize
 {
-  if (self == [FBSDKAppEventsDeviceInfo class]) {
+  if (self == FBSDKAppEventsDeviceInfo.class) {
     [[self sharedDeviceInfo] _collectPersistentData];
   }
 }
@@ -91,7 +97,7 @@ static const u_int FB_GIGABYTE = 1024 * 1024 * 1024; // bytes
 {
   static FBSDKAppEventsDeviceInfo *_sharedDeviceInfo = nil;
   if (_sharedDeviceInfo == nil) {
-    _sharedDeviceInfo = [[FBSDKAppEventsDeviceInfo alloc] init];
+    _sharedDeviceInfo = [FBSDKAppEventsDeviceInfo new];
   }
   return _sharedDeviceInfo;
 }
@@ -141,13 +147,13 @@ static const u_int FB_GIGABYTE = 1024 * 1024 * 1024; // bytes
 - (void)_collectPersistentData
 {
   // Bundle stuff
-  NSBundle *mainBundle = [NSBundle mainBundle];
+  NSBundle *mainBundle = NSBundle.mainBundle;
   _bundleIdentifier = mainBundle.bundleIdentifier;
   _longVersion = [mainBundle objectForInfoDictionaryKey:@"CFBundleVersion"];
   _shortVersion = [mainBundle objectForInfoDictionaryKey:@"CFBundleShortVersionString"];
 
   // Locale stuff
-  _language = [NSLocale currentLocale].localeIdentifier;
+  _language = NSLocale.currentLocale.localeIdentifier;
 
   // Device stuff
   UIDevice *device = [UIDevice currentDevice];
@@ -171,7 +177,7 @@ static const u_int FB_GIGABYTE = 1024 * 1024 * 1024; // bytes
 
 - (BOOL)_isGroup1Expired
 {
-  return ([FBSDKAppEventsUtility unixTimeNow] - _lastGroup1CheckTime) > FB_GROUP1_RECHECK_DURATION;
+  return ([self unixTimeNow] - _lastGroup1CheckTime) > FB_GROUP1_RECHECK_DURATION;
 }
 
 // This data is collected only once every GROUP1_RECHECK_DURATION.
@@ -181,16 +187,16 @@ static const u_int FB_GIGABYTE = 1024 * 1024 * 1024; // bytes
 
   if (!_carrierName || !shouldUseCachedValues) {
     NSString *newCarrierName = [FBSDKAppEventsDeviceInfo _getCarrier];
-    if (![newCarrierName isEqualToString:_carrierName]) {
+    if (!_carrierName || ![newCarrierName isEqualToString:_carrierName]) {
       _carrierName = newCarrierName;
       _isEncodingDirty = YES;
     }
   }
 
   if (!_timeZoneName || !_timeZoneAbbrev || !shouldUseCachedValues) {
-    NSTimeZone *timeZone = [NSTimeZone systemTimeZone];
+    NSTimeZone *timeZone = NSTimeZone.systemTimeZone;
     NSString *timeZoneName = timeZone.name;
-    if (![timeZoneName isEqualToString:_timeZoneName]) {
+    if (!_timeZoneName || ![timeZoneName isEqualToString:_timeZoneName]) {
       _timeZoneName = timeZoneName;
       _timeZoneAbbrev = timeZone.abbreviation;
       _isEncodingDirty = YES;
@@ -205,7 +211,7 @@ static const u_int FB_GIGABYTE = 1024 * 1024 * 1024; // bytes
     _isEncodingDirty = YES;
   }
 
-  _lastGroup1CheckTime = [FBSDKAppEventsUtility unixTimeNow];
+  _lastGroup1CheckTime = [self unixTimeNow];
 }
 
 - (NSString *)_generateEncoding
@@ -237,17 +243,22 @@ static const u_int FB_GIGABYTE = 1024 * 1024 * 1024; // bytes
 
 #pragma mark - Helper Methods
 
+- (NSTimeInterval)unixTimeNow
+{
+  return round([NSDate date].timeIntervalSince1970);
+}
+
 + (NSNumber *)_getTotalDiskSpace
 {
-  NSDictionary *attrs = [[[NSFileManager alloc] init] attributesOfFileSystemForPath:NSHomeDirectory()
-                                                                              error:nil];
+  NSDictionary<NSString *, id> *attrs = [[NSFileManager new] attributesOfFileSystemForPath:NSHomeDirectory()
+                                                                                     error:nil];
   return attrs[NSFileSystemSize];
 }
 
 + (NSNumber *)_getRemainingDiskSpace
 {
-  NSDictionary *attrs = [[[NSFileManager alloc] init] attributesOfFileSystemForPath:NSHomeDirectory()
-                                                                              error:nil];
+  NSDictionary<NSString *, id> *attrs = [[NSFileManager new] attributesOfFileSystemForPath:NSHomeDirectory()
+                                                                                     error:nil];
   return attrs[NSFileSystemFreeSize];
 }
 

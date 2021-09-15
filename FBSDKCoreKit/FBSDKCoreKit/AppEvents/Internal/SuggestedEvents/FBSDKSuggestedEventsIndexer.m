@@ -28,60 +28,127 @@
  #import <sys/sysctl.h>
  #import <sys/utsname.h>
 
- #import "FBSDKCoreKit+Internal.h"
+ #import "FBSDKAppEvents.h"
+ #import "FBSDKAppEvents+EventLogging.h"
+ #import "FBSDKAppEventsUtility.h"
+ #import "FBSDKCoreKitBasicsImport.h"
+ #import "FBSDKEventProcessing.h"
+ #import "FBSDKFeatureExtracting.h"
  #import "FBSDKFeatureExtractor.h"
+ #import "FBSDKGraphRequestFactory.h"
+ #import "FBSDKInternalUtility+Internal.h"
  #import "FBSDKMLMacros.h"
  #import "FBSDKModelManager.h"
  #import "FBSDKModelUtility.h"
+ #import "FBSDKServerConfigurationManager+ServerConfigurationProviding.h"
+ #import "FBSDKSettings+Internal.h"
+ #import "FBSDKSwizzler+Swizzling.h"
+ #import "FBSDKSwizzling.h"
+ #import "FBSDKViewHierarchy.h"
+ #import "FBSDKViewHierarchyMacros.h"
 
 NSString *const OptInEvents = @"production_events";
 NSString *const UnconfirmedEvents = @"eligible_for_prediction_events";
 
-static NSMutableSet<NSString *> *_optInEvents;
-static NSMutableSet<NSString *> *_unconfirmedEvents;
+@interface FBSDKSuggestedEventsIndexer ()
+
+@property (nonatomic, readonly) id<FBSDKGraphRequestProviding> requestProvider;
+@property (nonatomic, readonly) id<FBSDKServerConfigurationProviding> serverConfigurationProvider;
+@property (nonatomic, readonly) Class<FBSDKSwizzling> swizzler;
+@property (nonatomic, readonly) id<FBSDKSettings> settings;
+@property (nonatomic, readonly) id<FBSDKEventLogging> eventLogger;
+@property (nonatomic, readonly) Class<FBSDKFeatureExtracting> featureExtractor;
+@property (nonatomic, readonly) NSMutableSet<NSString *> *optInEvents;
+@property (nonatomic, readonly) NSMutableSet<NSString *> *unconfirmedEvents;
+@property (nonatomic, readonly, weak) id<FBSDKEventProcessing> eventProcessor;
+
+@end
 
 @implementation FBSDKSuggestedEventsIndexer
 
-+ (void)initialize
+- (instancetype)init
 {
-  _optInEvents = [NSMutableSet set];
-  _unconfirmedEvents = [NSMutableSet set];
+  return [self initWithGraphRequestProvider:[FBSDKGraphRequestFactory new]
+                serverConfigurationProvider:FBSDKServerConfigurationManager.shared
+                                   swizzler:FBSDKSwizzler.class
+                                   settings:FBSDKSettings.sharedSettings
+                                eventLogger:FBSDKAppEvents.singleton
+                           featureExtractor:FBSDKFeatureExtractor.class
+                             eventProcessor:FBSDKModelManager.shared];
 }
 
-+ (void)enable
+- (instancetype)initWithGraphRequestProvider:(id<FBSDKGraphRequestProviding>)requestProvider
+                 serverConfigurationProvider:(id<FBSDKServerConfigurationProviding>)serverConfigurationProvider
+                                    swizzler:(Class<FBSDKSwizzling>)swizzler
+                                    settings:(id<FBSDKSettings>)settings
+                                 eventLogger:(id<FBSDKEventLogging>)eventLogger
+                            featureExtractor:(Class<FBSDKFeatureExtracting>)featureExtractor
+                              eventProcessor:(id<FBSDKEventProcessing>)eventProcessor
 {
-  [FBSDKServerConfigurationManager loadServerConfigurationWithCompletionBlock:^(FBSDKServerConfiguration *serverConfiguration, NSError *error) {
+  if ((self = [super init])) {
+    _optInEvents = [NSMutableSet set];
+    _unconfirmedEvents = [NSMutableSet set];
+    _requestProvider = requestProvider;
+    _serverConfigurationProvider = serverConfigurationProvider;
+    _swizzler = swizzler;
+    _settings = settings;
+    _eventLogger = eventLogger;
+    _featureExtractor = featureExtractor;
+    _eventProcessor = eventProcessor;
+  }
+  return self;
+}
+
+// Transitional singleton introduced as a way to change the usage semantics
+// from a type-based interface to an instance-based interface.
++ (instancetype)shared
+{
+  static dispatch_once_t nonce;
+  static id instance;
+  dispatch_once(&nonce, ^{
+    instance = [self new];
+  });
+  return instance;
+}
+
+- (void)enable
+{
+  __weak typeof(self) weakSelf = self;
+  [self.serverConfigurationProvider loadServerConfigurationWithCompletionBlock:^(FBSDKServerConfiguration *serverConfiguration, NSError *error) {
     if (error) {
       return;
     }
 
     NSDictionary<NSString *, id> *suggestedEventsSetting = serverConfiguration.suggestedEventsSetting;
-    if ([suggestedEventsSetting isKindOfClass:[NSNull class]] || !suggestedEventsSetting[OptInEvents] || !suggestedEventsSetting[UnconfirmedEvents]) {
+    if ([suggestedEventsSetting isKindOfClass:NSNull.class] || !suggestedEventsSetting[OptInEvents] || !suggestedEventsSetting[UnconfirmedEvents]) {
       return;
     }
 
-    [_optInEvents addObjectsFromArray:suggestedEventsSetting[OptInEvents]];
-    [_unconfirmedEvents addObjectsFromArray:suggestedEventsSetting[UnconfirmedEvents]];
+    [weakSelf.optInEvents addObjectsFromArray:suggestedEventsSetting[OptInEvents]];
+    [weakSelf.unconfirmedEvents addObjectsFromArray:suggestedEventsSetting[UnconfirmedEvents]];
 
-    [FBSDKSuggestedEventsIndexer setup];
+    [weakSelf setup];
   }];
 }
 
-+ (void)setup
+static dispatch_once_t setupNonce;
+- (void)setup
 {
   // won't do the model prediction when there is no opt-in event and unconfirmed event
   if (_optInEvents.count == 0 && _unconfirmedEvents.count == 0) {
     return;
   }
 
-  static dispatch_once_t onceToken;
-  dispatch_once(&onceToken, ^{
+  dispatch_once(&setupNonce, ^{
     // swizzle UIButton
-    [FBSDKSwizzler swizzleSelector:@selector(didMoveToWindow) onClass:[UIControl class] withBlock:^(UIControl *control) {
-                                                                                          if (control.window && [control isKindOfClass:[UIButton class]]) {
-                                                                                            [((UIButton *)control) addTarget:self action:@selector(buttonClicked:) forControlEvents:UIControlEventTouchDown];
-                                                                                          }
-                                                                                        } named:@"suggested_events"];
+    [self.swizzler swizzleSelector:@selector(didMoveToWindow)
+                           onClass:UIControl.class
+                         withBlock:^(UIControl *control) {
+                           if (control.window && [control isKindOfClass:UIButton.class]) {
+                             [((UIButton *)control) addTarget:self action:@selector(buttonClicked:) forControlEvents:UIControlEventTouchDown];
+                           }
+                         }
+                             named:@"suggested_events"];
 
     // UITableView
     void (^tableViewBlock)(UITableView *tableView,
@@ -90,8 +157,8 @@ static NSMutableSet<NSString *> *_unconfirmedEvents;
     ^(UITableView *tableView, SEL cmd, id<UITableViewDelegate> delegate) {
       [self handleView:tableView withDelegate:delegate];
     };
-    [FBSDKSwizzler swizzleSelector:@selector(setDelegate:)
-                           onClass:[UITableView class]
+    [self.swizzler swizzleSelector:@selector(setDelegate:)
+                           onClass:UITableView.class
                          withBlock:tableViewBlock
                              named:@"suggested_events"];
 
@@ -102,8 +169,8 @@ static NSMutableSet<NSString *> *_unconfirmedEvents;
     ^(UICollectionView *collectionView, SEL cmd, id<UICollectionViewDelegate> delegate) {
       [self handleView:collectionView withDelegate:delegate];
     };
-    [FBSDKSwizzler swizzleSelector:@selector(setDelegate:)
-                           onClass:[UICollectionView class]
+    [self.swizzler swizzleSelector:@selector(setDelegate:)
+                           onClass:UICollectionView.class
                          withBlock:collectionViewBlock
                              named:@"suggested_events"];
 
@@ -113,7 +180,7 @@ static NSMutableSet<NSString *> *_unconfirmedEvents;
   });
 }
 
-+ (void)rematchBindings
+- (void)rematchBindings
 {
   NSArray *windows = [UIApplication sharedApplication].windows;
   for (UIWindow *window in windows) {
@@ -121,67 +188,67 @@ static NSMutableSet<NSString *> *_unconfirmedEvents;
   }
 }
 
-+ (void)matchSubviewsIn:(UIView *)view
+- (void)matchSubviewsIn:(UIView *)view
 {
   if (!view) {
     return;
   }
 
   for (UIView *subview in view.subviews) {
-    if ([subview isKindOfClass:[UITableView class]]) {
+    if ([subview isKindOfClass:UITableView.class]) {
       UITableView *tableView = (UITableView *)subview;
       [self handleView:tableView withDelegate:tableView.delegate];
-    } else if ([subview isKindOfClass:[UICollectionView class]]) {
+    } else if ([subview isKindOfClass:UICollectionView.class]) {
       UICollectionView *collectionView = (UICollectionView *)subview;
       [self handleView:collectionView withDelegate:collectionView.delegate];
-    } else if ([subview isKindOfClass:[UIButton class]]) {
+    } else if ([subview isKindOfClass:UIButton.class]) {
       [(UIButton *)subview addTarget:self action:@selector(buttonClicked:) forControlEvents:UIControlEventTouchDown];
     }
 
-    if (![subview isKindOfClass:[UIControl class]]) {
+    if (![subview isKindOfClass:UIControl.class]) {
       [self matchSubviewsIn:subview];
     }
   }
 }
 
-+ (void)buttonClicked:(UIButton *)button
+- (void)buttonClicked:(UIButton *)button
 {
   [self predictEventWithUIResponder:button
                                text:[FBSDKViewHierarchy getText:button]];
 }
 
-+ (void)handleView:(UIView *)view withDelegate:(id)delegate
+- (void)handleView:(UIView *)view withDelegate:(id)delegate
 {
   if (!delegate) {
     return;
   }
 
-  if ([view isKindOfClass:[UITableView class]]
+  if ([view isKindOfClass:UITableView.class]
       && [delegate respondsToSelector:@selector(tableView:didSelectRowAtIndexPath:)]) {
     void (^block)(id, SEL, id, id) = ^(id target, SEL command, UITableView *tableView, NSIndexPath *indexPath) {
       UITableViewCell *cell = [tableView cellForRowAtIndexPath:indexPath];
       [self predictEventWithUIResponder:cell
                                    text:[self getTextFromContentView:[cell contentView]]];
     };
-    [FBSDKSwizzler swizzleSelector:@selector(tableView:didSelectRowAtIndexPath:)
+    [self.swizzler swizzleSelector:@selector(tableView:didSelectRowAtIndexPath:)
                            onClass:[delegate class]
                          withBlock:block
                              named:@"suggested_events"];
-  } else if ([view isKindOfClass:[UICollectionView class]]
+  } else if ([view isKindOfClass:UICollectionView.class]
              && [delegate respondsToSelector:@selector(collectionView:didSelectItemAtIndexPath:)]) {
     void (^block)(id, SEL, id, id) = ^(id target, SEL command, UICollectionView *collectionView, NSIndexPath *indexPath) {
       UICollectionViewCell *cell = [collectionView cellForItemAtIndexPath:indexPath];
       [self predictEventWithUIResponder:cell
                                    text:[self getTextFromContentView:[cell contentView]]];
     };
-    [FBSDKSwizzler swizzleSelector:@selector(collectionView:didSelectItemAtIndexPath:)
+    [self.swizzler swizzleSelector:@selector(collectionView:didSelectItemAtIndexPath:)
                            onClass:[delegate class]
                          withBlock:block
                              named:@"suggested_events"];
   }
 }
 
-+ (void)predictEventWithUIResponder:(UIResponder *)uiResponder text:(NSString *)text
+- (void)predictEventWithUIResponder:(UIResponder *)uiResponder text:(NSString *)text
 {
   if (text.length > 100 || text.length == 0 || [FBSDKAppEventsUtility isSensitiveUserData:text]) {
     return;
@@ -208,48 +275,55 @@ static NSMutableSet<NSString *> *_unconfirmedEvents;
     NSMutableDictionary<NSString *, id> *viewTree = [NSMutableDictionary dictionary];
 
     NSString *screenName = nil;
-    UIViewController *topMostViewController = [FBSDKInternalUtility topMostViewController];
+    UIViewController *topMostViewController = [FBSDKInternalUtility.sharedUtility topMostViewController];
     if (topMostViewController) {
-      screenName = NSStringFromClass([topMostViewController class]);
+      screenName = NSStringFromClass(topMostViewController.class);
     }
 
     [FBSDKTypeUtility dictionary:viewTree setObject:trees forKey:VIEW_HIERARCHY_VIEW_KEY];
     [FBSDKTypeUtility dictionary:viewTree setObject:screenName ?: @"" forKey:VIEW_HIERARCHY_SCREEN_NAME_KEY];
 
-    fb_dispatch_on_default_thread(^{
+    __weak typeof(self) weakSelf = self;
+    dispatch_block_t predictAndLogBlock = ^{
       NSMutableDictionary<NSString *, id> *viewTreeCopy = [viewTree mutableCopy];
-      float *denseData = [FBSDKFeatureExtractor getDenseFeatures:viewTree];
-      NSString *textFeature = [FBSDKModelUtility normalizeText:[FBSDKFeatureExtractor getTextFeature:text withScreenName:viewTreeCopy[@"screenname"]]];
-      NSString *event = [FBSDKModelManager processSuggestedEvents:textFeature denseData:denseData];
+      float *denseData = [weakSelf.featureExtractor getDenseFeatures:viewTree];
+      NSString *textFeature = [FBSDKModelUtility normalizedText:[FBSDKFeatureExtractor getTextFeature:text withScreenName:viewTreeCopy[@"screenname"]]];
+      NSString *event = [weakSelf.eventProcessor processSuggestedEvents:textFeature denseData:denseData];
       if (!event || [event isEqualToString:SUGGESTED_EVENT_OTHER]) {
         return;
       }
-      if ([_optInEvents containsObject:event]) {
-        [FBSDKAppEvents logEvent:event
-                      parameters:@{@"_is_suggested_event" : @"1",
-                                   @"_button_text" : text}];
-      } else if ([_unconfirmedEvents containsObject:event]) {
+      if ([weakSelf.optInEvents containsObject:event]) {
+        [weakSelf.eventLogger logEvent:event
+                            parameters:@{@"_is_suggested_event" : @"1",
+                                         @"_button_text" : text}];
+      } else if ([weakSelf.unconfirmedEvents containsObject:event] && denseData) {
         // Only send back not confirmed events to advertisers
-        [self logSuggestedEvent:event withText:text withDenseFeature:[self getDenseFeaure:denseData] ?: @""];
+        [weakSelf logSuggestedEvent:event text:text denseFeature:[self getDenseFeaure:denseData] ?: @""];
       }
       free(denseData);
-    });
+    };
+
+  #if FBTEST
+    predictAndLogBlock();
+  #else
+    fb_dispatch_on_default_thread(predictAndLogBlock);
+  #endif
   });
 }
 
  #pragma mark - Helper Methods
 
-+ (NSString *)getDenseFeaure:(float *)denseData
+- (NSString *)getDenseFeaure:(float *)denseData
 {
   // Get dense feature string
   NSMutableArray *denseDataArray = [NSMutableArray array];
   for (int i = 0; i < 30; i++) {
-    [FBSDKTypeUtility array:denseDataArray addObject:[NSNumber numberWithFloat:denseData[i]]];
+    [FBSDKTypeUtility array:denseDataArray addObject:@(denseData[i])];
   }
   return [denseDataArray componentsJoinedByString:@","];
 }
 
-+ (NSString *)getTextFromContentView:(UIView *)contentView
+- (NSString *)getTextFromContentView:(UIView *)contentView
 {
   NSMutableArray<NSString *> *textArray = [NSMutableArray array];
   for (UIView *subView in [contentView subviews]) {
@@ -261,8 +335,13 @@ static NSMutableSet<NSString *> *_unconfirmedEvents;
   return [textArray componentsJoinedByString:@" "];
 }
 
-+ (void)logSuggestedEvent:(NSString *)event withText:(NSString *)text withDenseFeature:(NSString *)denseFeature
+- (void)logSuggestedEvent:(NSString *)event
+                     text:(NSString *)text
+             denseFeature:(NSString *)denseFeature
 {
+  if (!denseFeature) {
+    return;
+  }
   NSString *metadata = [FBSDKBasicUtility JSONStringForObject:@{@"button_text" : text,
                                                                 @"dense" : denseFeature, }
                                                         error:nil
@@ -271,16 +350,28 @@ static NSMutableSet<NSString *> *_unconfirmedEvents;
     return;
   }
 
-  FBSDKGraphRequest *request = [[FBSDKGraphRequest alloc]
-                                initWithGraphPath:[NSString stringWithFormat:@"%@/suggested_events", [FBSDKSettings appID]]
-                                parameters:@{
-                                  @"event_name" : event,
-                                  @"metadata" : metadata,
-                                }
-                                HTTPMethod:FBSDKHTTPMethodPOST];
-  [request startWithCompletionHandler:^(FBSDKGraphRequestConnection *connection, id result, NSError *error) {}];
+  id<FBSDKGraphRequest> request = [self.requestProvider createGraphRequestWithGraphPath:[NSString stringWithFormat:@"%@/suggested_events", [self.settings appID]]
+                                                                             parameters:@{
+                                     @"event_name" : event,
+                                     @"metadata" : metadata,
+                                   }
+                                                                             HTTPMethod:FBSDKHTTPMethodPOST];
+  [request startWithCompletion:^(id<FBSDKGraphRequestConnecting> connection, id result, NSError *error) {}];
   return;
 }
+
+ #pragma mark - Testability
+
+ #if FBTEST
+
++ (void)reset
+{
+  if (setupNonce) {
+    setupNonce = 0;
+  }
+}
+
+ #endif
 
 @end
 

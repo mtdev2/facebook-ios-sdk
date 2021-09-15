@@ -44,6 +44,7 @@ FBSDKAppEventUserDataType FBSDKAppEventCity = @"ct";
 FBSDKAppEventUserDataType FBSDKAppEventState = @"st";
 FBSDKAppEventUserDataType FBSDKAppEventZip = @"zp";
 FBSDKAppEventUserDataType FBSDKAppEventCountry = @"country";
+FBSDKAppEventUserDataType FBSDKAppEventExternalId = @"external_id";
 
 @implementation FBSDKUserDataStore
 
@@ -52,7 +53,7 @@ FBSDKAppEventUserDataType FBSDKAppEventCountry = @"country";
   serialQueue = dispatch_queue_create("com.facebook.appevents.UserDataStore", DISPATCH_QUEUE_SERIAL);
   hashedUserData = [FBSDKUserDataStore initializeUserData:FBSDKUserDataKey];
   internalHashedUserData = [FBSDKUserDataStore initializeUserData:FBSDKInternalUserDataKey];
-  enabledRules = [[NSMutableSet alloc] init];
+  enabledRules = [NSMutableSet new];
 }
 
 + (void)setUserEmail:(nullable NSString *)email
@@ -65,8 +66,9 @@ FBSDKAppEventUserDataType FBSDKAppEventCountry = @"country";
                state:(nullable NSString *)state
                  zip:(nullable NSString *)zip
              country:(nullable NSString *)country
+          externalId:(nullable NSString *)externalId
 {
-  NSMutableDictionary *ud = [[NSMutableDictionary alloc] init];
+  NSMutableDictionary<NSString *, NSString *> *ud = [NSMutableDictionary new];
   if (email) {
     [FBSDKTypeUtility dictionary:ud setObject:[FBSDKUserDataStore encryptData:email type:FBSDKAppEventEmail] forKey:FBSDKAppEventEmail];
   }
@@ -97,11 +99,14 @@ FBSDKAppEventUserDataType FBSDKAppEventCountry = @"country";
   if (country) {
     [FBSDKTypeUtility dictionary:ud setObject:[FBSDKUserDataStore encryptData:country type:FBSDKAppEventCountry] forKey:FBSDKAppEventCountry];
   }
+  if (externalId) {
+    [FBSDKTypeUtility dictionary:ud setObject:[FBSDKUserDataStore encryptData:externalId type:FBSDKAppEventExternalId] forKey:FBSDKAppEventExternalId];
+  }
 
   dispatch_async(serialQueue, ^{
     hashedUserData = [ud mutableCopy];
-    [[NSUserDefaults standardUserDefaults] setObject:[FBSDKUserDataStore stringByHashedData:hashedUserData]
-                                              forKey:FBSDKUserDataKey];
+    [NSUserDefaults.standardUserDefaults setObject:[FBSDKUserDataStore stringByHashedData:hashedUserData]
+                                            forKey:FBSDKUserDataKey];
   });
 }
 
@@ -121,8 +126,8 @@ FBSDKAppEventUserDataType FBSDKAppEventCountry = @"country";
     } else {
       [FBSDKTypeUtility dictionary:hashedUserData setObject:hashData forKey:type];
     }
-    [[NSUserDefaults standardUserDefaults] setObject:[FBSDKUserDataStore stringByHashedData:hashedUserData]
-                                              forKey:FBSDKUserDataKey];
+    [NSUserDefaults.standardUserDefaults setObject:[FBSDKUserDataStore stringByHashedData:hashedUserData]
+                                            forKey:FBSDKUserDataKey];
   });
 }
 
@@ -135,8 +140,8 @@ FBSDKAppEventUserDataType FBSDKAppEventCountry = @"country";
     } else {
       internalHashedUserData[type] = hashData;
     }
-    [[NSUserDefaults standardUserDefaults] setObject:[FBSDKUserDataStore stringByHashedData:internalHashedUserData]
-                                              forKey:FBSDKInternalUserDataKey];
+    [NSUserDefaults.standardUserDefaults setObject:[FBSDKUserDataStore stringByHashedData:internalHashedUserData]
+                                            forKey:FBSDKInternalUserDataKey];
   });
 }
 
@@ -161,7 +166,7 @@ FBSDKAppEventUserDataType FBSDKAppEventCountry = @"country";
 {
   __block NSString *hashedUserDataString;
   dispatch_sync(serialQueue, ^{
-    NSMutableDictionary<NSString *, NSString *> *hashedUD = [[NSMutableDictionary alloc] init];
+    NSMutableDictionary<NSString *, NSString *> *hashedUD = [NSMutableDictionary new];
     [hashedUD addEntriesFromDictionary:hashedUserData];
     for (NSString *key in enabledRules) {
       if (internalHashedUserData[key]) {
@@ -184,7 +189,8 @@ FBSDKAppEventUserDataType FBSDKAppEventCountry = @"country";
                               city:nil
                              state:nil
                                zip:nil
-                           country:nil];
+                           country:nil
+                        externalId:nil];
 }
 
 + (NSString *)getInternalHashedDataForType:(FBSDKAppEventUserDataType)type
@@ -200,7 +206,7 @@ FBSDKAppEventUserDataType FBSDKAppEventCountry = @"country";
 
 + (NSMutableDictionary<NSString *, NSString *> *)initializeUserData:(NSString *)userDataKey
 {
-  NSString *userData = [[NSUserDefaults standardUserDefaults] stringForKey:userDataKey];
+  NSString *userData = [NSUserDefaults.standardUserDefaults stringForKey:userDataKey];
   NSMutableDictionary<NSString *, NSString *> *hashedUD = nil;
   if (userData) {
     hashedUD = (NSMutableDictionary<NSString *, NSString *> *)[FBSDKTypeUtility JSONObjectWithData:[userData dataUsingEncoding:NSUTF8StringEncoding]
@@ -208,7 +214,7 @@ FBSDKAppEventUserDataType FBSDKAppEventCountry = @"country";
                                                              error: nil];
   }
   if (!hashedUD) {
-    hashedUD = [[NSMutableDictionary alloc] init];
+    hashedUD = [NSMutableDictionary new];
   }
   return hashedUD;
 }
@@ -243,7 +249,7 @@ FBSDKAppEventUserDataType FBSDKAppEventCountry = @"country";
   NSSet<FBSDKAppEventUserDataType> *set = [NSSet setWithArray:
                                            @[FBSDKAppEventEmail, FBSDKAppEventFirstName, FBSDKAppEventLastName, FBSDKAppEventCity, FBSDKAppEventState, FBSDKAppEventCountry]];
   if ([set containsObject:type]) {
-    normalizedData = [data stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]];
+    normalizedData = [data stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceCharacterSet];
     normalizedData = normalizedData.lowercaseString;
   } else if ([type isEqualToString:FBSDKAppEventPhone]) {
     NSError *error = nil;
@@ -257,9 +263,11 @@ FBSDKAppEventUserDataType FBSDKAppEventCountry = @"country";
                                                 withTemplate:@""
     ];
   } else if ([type isEqualToString:FBSDKAppEventGender]) {
-    NSString *temp = [data stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]];
+    NSString *temp = [data stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceCharacterSet];
     temp = temp.lowercaseString;
     normalizedData = temp.length > 0 ? [temp substringToIndex:1] : @"";
+  } else if ([type isEqualToString:FBSDKAppEventExternalId]) {
+    normalizedData = data;
   }
   return normalizedData;
 }

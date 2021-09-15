@@ -18,13 +18,10 @@
 
 #import <UIKit/UIKit.h>
 
-@interface FBSDKShareKitTestUtility : NSObject
+NS_ASSUME_NONNULL_BEGIN
 
-/**
- *  Mocks the main NSBundle to return the bundle containing this class, instead
- * of the XCTest program bundle.
- */
-+ (id)mainBundleMock;
+NS_SWIFT_NAME(ShareKitTestUtility)
+@interface FBSDKShareKitTestUtility : NSObject
 
 /*!
  * @abstract Returns a UIImage for sharing.
@@ -42,3 +39,5 @@
 + (NSURL *)testPNGImageURL;
 
 @end
+
+NS_ASSUME_NONNULL_END

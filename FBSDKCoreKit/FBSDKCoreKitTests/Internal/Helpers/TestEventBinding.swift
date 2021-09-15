@@ -19,18 +19,19 @@
 class TestEventBinding: EventBinding {
   var trackEventWasCalled = false
   var stubbedPath = [Any]()
+  let stubbedEventLogger = TestEventLogger()
 
   init(view potentialView: UIView? = nil) {
-    super.init()
+    super.init(json: [:], eventLogger: stubbedEventLogger)
 
     if let view = potentialView,
-       let path = ViewHierarchy.getPath(view) {
+       let path = ViewHierarchy.getPath(view) { // swiftlint:disable:this indentation_width
       stubbedPath = path
     }
   }
 
   override var path: [Any]! { // swiftlint:disable:this implicitly_unwrapped_optional
-    return stubbedPath
+    stubbedPath
   }
 
   override func trackEvent(_ sender: Any!) { // swiftlint:disable:this implicitly_unwrapped_optional

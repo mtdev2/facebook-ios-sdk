@@ -26,7 +26,7 @@ public class SampleUserProfiles: NSObject {
   public static let defaultUserID = "123"
 
   public class var valid: Profile {
-    return Profile(
+    Profile(
       userID: defaultUserID,
       firstName: "John",
       middleName: "K",
@@ -41,7 +41,10 @@ public class SampleUserProfiles: NSObject {
         "789",
       ],
       birthday: Date(timeIntervalSince1970: 0),
-      ageRange: UserAgeRange(from: ["min": 21])
+      ageRange: UserAgeRange(from: ["min": 21]),
+      hometown: Location(from: ["id": "112724962075996", "name": "Martinez, California"]),
+      location: Location(from: ["id": "110843418940484", "name": "Seattle, Washington"]),
+      gender: "male"
     )
   }
 
@@ -49,11 +52,11 @@ public class SampleUserProfiles: NSObject {
   public static var validLimited = createValid(isLimited: true)
 
   public static func createValid(userID: String) -> Profile {
-    return createValid(userID: userID, name: defaultName)
+    createValid(userID: userID, name: defaultName)
   }
 
   public static func createValid(isExpired: Bool) -> Profile {
-    return createValid(name: defaultName, isExpired: isExpired)
+    createValid(name: defaultName, isExpired: isExpired)
   }
 
   public static func createValid(
@@ -63,7 +66,7 @@ public class SampleUserProfiles: NSObject {
     isExpired: Bool = false,
     isLimited: Bool = false
   ) -> Profile {
-    return Profile(
+    Profile(
       userID: userID,
       firstName: "John",
       middleName: "K",
@@ -79,6 +82,9 @@ public class SampleUserProfiles: NSObject {
       ],
       birthday: Date(timeIntervalSince1970: 0),
       ageRange: UserAgeRange(from: ["min": 21]),
+      hometown: Location(from: ["id": "112724962075996", "name": "Martinez, California"]),
+      location: Location(from: ["id": "110843418940484", "name": "Seattle, Washington"]),
+      gender: "male",
       isLimited: isLimited
     )
   }

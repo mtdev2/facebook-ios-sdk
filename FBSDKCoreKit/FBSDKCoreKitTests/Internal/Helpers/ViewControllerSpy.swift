@@ -32,7 +32,7 @@ class ViewControllerSpy: UIViewController {
 
   // Overriding with no implementation to stub the property
   override var transitionCoordinator: UIViewControllerTransitionCoordinator? {
-    return stubbedTransitionCoordinator
+    stubbedTransitionCoordinator
   }
 
   private lazy var presenting = {
@@ -40,7 +40,7 @@ class ViewControllerSpy: UIViewController {
   }()
 
   override var presentingViewController: UIViewController? {
-    return presenting
+    presenting
   }
 
   override func dismiss(animated flag: Bool, completion: (() -> Void)? = nil) {
@@ -49,14 +49,15 @@ class ViewControllerSpy: UIViewController {
   }
 
   static func makeDefaultSpy() -> ViewControllerSpy {
-    return ViewControllerSpy()
+    ViewControllerSpy()
   }
 
   // Overriding with no implementation to stub the method
   override func present(
     _ viewControllerToPresent: UIViewController,
     animated: Bool,
-    completion: (() -> Void)? = nil) {
+    completion: (() -> Void)? = nil
+  ) {
     capturedPresentViewController = viewControllerToPresent
     capturedPresentViewControllerAnimated = animated
     capturedPresentViewControllerCompletion = completion

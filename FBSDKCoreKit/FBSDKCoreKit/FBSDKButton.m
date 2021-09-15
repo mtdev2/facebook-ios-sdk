@@ -20,22 +20,39 @@
 #import "FBSDKButton+Subclass.h"
 
 #import "FBSDKAccessToken.h"
-#import "FBSDKAppEvents.h"
+#import "FBSDKAccessToken+AccessTokenProtocols.h"
 #import "FBSDKAppEvents+Internal.h"
-#import "FBSDKApplicationDelegate+Internal.h"
+#import "FBSDKApplicationLifecycleNotifications.h"
 #import "FBSDKLogo.h"
 #import "FBSDKUIUtility.h"
 #import "FBSDKViewImpressionTracker.h"
+#import "NSNotificationCenter+Extensions.h"
 
 #define HEIGHT_TO_FONT_SIZE 0.47
 #define HEIGHT_TO_MARGIN 0.27
 #define HEIGHT_TO_PADDING 0.23
 #define HEIGHT_TO_TEXT_PADDING_CORRECTION 0.08
 
+@interface FBSDKButton ()
+
+@property (class, nonatomic) id applicationActivationNotifier;
+@property (nonatomic) BOOL skipIntrinsicContentSizing;
+@property (nonatomic) BOOL isExplicitlyDisabled;
+
+@end
+
 @implementation FBSDKButton
+
+static id _applicationActivationNotifier;
+
++ (id)applicationActivationNotifier
 {
-  BOOL _skipIntrinsicContentSizing;
-  BOOL _isExplicitlyDisabled;
+  return _applicationActivationNotifier;
+}
+
++ (void)setApplicationActivationNotifier:(id)notifier
+{
+  _applicationActivationNotifier = notifier;
 }
 
 #pragma mark - Object Lifecycle
@@ -60,7 +77,7 @@
 
 - (void)dealloc
 {
-  [[NSNotificationCenter defaultCenter] removeObserver:self];
+  [NSNotificationCenter.defaultCenter removeObserver:self];
 }
 
 #pragma mark - Properties
@@ -94,21 +111,6 @@
   CGSize size = [self sizeThatFits:CGSizeMake(CGFLOAT_MAX, CGFLOAT_MAX)];
   _skipIntrinsicContentSizing = NO;
   return size;
-}
-
-- (void)layoutSubviews
-{
-  // automatic impression tracking if the button conforms to FBSDKButtonImpressionTracking
-  if ([self conformsToProtocol:@protocol(FBSDKButtonImpressionTracking)]) {
-    NSString *eventName = ((id<FBSDKButtonImpressionTracking>)self).impressionTrackingEventName;
-    NSString *identifier = ((id<FBSDKButtonImpressionTracking>)self).impressionTrackingIdentifier;
-    NSDictionary<NSString *, id> *parameters = ((id<FBSDKButtonImpressionTracking>)self).analyticsParameters;
-    if (eventName && identifier) {
-      FBSDKViewImpressionTracker *impressionTracker = [FBSDKViewImpressionTracker impressionTrackerWithEventName:eventName];
-      [impressionTracker logImpressionWithIdentifier:identifier parameters:parameters];
-    }
-  }
-  [super layoutSubviews];
 }
 
 - (CGSize)sizeThatFits:(CGSize)size
@@ -165,7 +167,7 @@
 
 #pragma mark - Subclass Methods
 
-- (void)logTapEventWithEventName:(NSString *)eventName parameters:(NSDictionary *)parameters
+- (void)logTapEventWithEventName:(NSString *)eventName parameters:(NSDictionary<NSString *, id> *)parameters
 {
   [FBSDKAppEvents logInternalEvent:eventName
                         parameters:parameters
@@ -248,7 +250,7 @@
 
 - (FBSDKIcon *)defaultIcon
 {
-  return [[FBSDKLogo alloc] init];
+  return [FBSDKLogo new];
 }
 
 - (UIColor *)defaultSelectedColor
@@ -280,7 +282,11 @@
   CGFloat padding = [self _paddingForHeight:height];
   CGFloat textPaddingCorrection = [self _textPaddingCorrectionForHeight:height];
   CGSize contentSize = CGSizeMake(height + padding + titleSize.width - textPaddingCorrection, height);
-  return FBSDKEdgeInsetsOutsetSize(contentSize, contentEdgeInsets);
+
+  return CGSizeMake(
+    contentEdgeInsets.left + contentSize.width + contentEdgeInsets.right,
+    contentEdgeInsets.top + contentSize.height + contentEdgeInsets.bottom
+  );
 }
 
 #pragma mark - Helper Methods
@@ -353,7 +359,7 @@
   self.adjustsImageWhenHighlighted = NO;
   self.contentHorizontalAlignment = UIControlContentHorizontalAlignmentFill;
   self.contentVerticalAlignment = UIControlContentVerticalAlignmentFill;
-  self.tintColor = [UIColor whiteColor];
+  self.tintColor = UIColor.whiteColor;
 
   BOOL forceSizeToFit = CGRectIsEmpty(self.bounds);
 
@@ -385,7 +391,7 @@
   #endif
   }
 
-  [self setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
+  [self setTitleColor:UIColor.whiteColor forState:UIControlStateNormal];
   [self setTitleColor:[self highlightedContentColor] forState:UIControlStateHighlighted | UIControlStateSelected];
 
   [self setTitle:title forState:UIControlStateNormal];
@@ -427,10 +433,10 @@
   if (forceSizeToFit) {
     [self sizeToFit];
   }
-  [[NSNotificationCenter defaultCenter] addObserver:self
-                                           selector:@selector(_applicationDidBecomeActiveNotification:)
-                                               name:FBSDKApplicationDidBecomeActiveNotification
-                                             object:[FBSDKApplicationDelegate sharedInstance]];
+  [NSNotificationCenter.defaultCenter addObserver:self
+                                         selector:@selector(_applicationDidBecomeActiveNotification:)
+                                             name:FBSDKApplicationDidBecomeActiveNotification
+                                           object:self.class.applicationActivationNotifier];
 }
 
 - (CGFloat)_fontSizeForHeight:(CGFloat)height

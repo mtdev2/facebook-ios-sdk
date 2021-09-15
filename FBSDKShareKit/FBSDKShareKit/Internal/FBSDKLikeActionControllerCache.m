@@ -24,7 +24,7 @@
 
  #import <UIKit/UIKit.h>
 
- #import "FBSDKCoreKitInternalImport.h"
+ #import "FBSDKCoreKitBasicsImportForShareKit.h"
  #import "FBSDKLikeActionController.h"
 
 // after 1 day, expire the cached states
@@ -33,11 +33,14 @@
  #define FBSDK_LIKE_ACTION_CONTROLLER_CACHE_ACCESS_TOKEN_KEY @"accessTokenString"
  #define FBSDK_LIKE_ACTION_CONTROLLER_CACHE_ITEMS_KEY @"items"
 
+@interface FBSDKLikeActionControllerCache ()
+
+@property (nonatomic) NSString *accessTokenString;
+@property (nonatomic) NSMutableDictionary<NSString *, id> *items;
+
+@end
+
 @implementation FBSDKLikeActionControllerCache
-{
-  NSString *_accessTokenString;
-  NSMutableDictionary *_items;
-}
 
  #pragma mark - Object Lifecycle
 
@@ -45,7 +48,7 @@
 {
   if ((self = [super init])) {
     _accessTokenString = [accessTokenString copy];
-    _items = [[NSMutableDictionary alloc] init];
+    _items = [NSMutableDictionary new];
   }
   return self;
 }
@@ -57,14 +60,14 @@
   return YES;
 }
 
-- (id)initWithCoder:(NSCoder *)decoder
+- (instancetype)initWithCoder:(NSCoder *)decoder
 {
-  NSString *accessTokenString = [decoder decodeObjectOfClass:[NSString class]
+  NSString *accessTokenString = [decoder decodeObjectOfClass:NSString.class
                                                       forKey:FBSDK_LIKE_ACTION_CONTROLLER_CACHE_ACCESS_TOKEN_KEY];
   if ((self = [self initWithAccessTokenString:accessTokenString])) {
-    NSSet *allowedClasses = [NSSet setWithObjects:[NSDictionary class], [FBSDKLikeActionController class], nil];
-    NSDictionary *items = [decoder decodeObjectOfClasses:allowedClasses
-                                                  forKey:FBSDK_LIKE_ACTION_CONTROLLER_CACHE_ITEMS_KEY];
+    NSSet *allowedClasses = [NSSet setWithObjects:[NSDictionary<NSString *, id> class], FBSDKLikeActionController.class, nil];
+    NSDictionary<NSString *, id> *items = [decoder decodeObjectOfClasses:allowedClasses
+                                                                  forKey:FBSDK_LIKE_ACTION_CONTROLLER_CACHE_ITEMS_KEY];
     _items = [[NSMutableDictionary alloc] initWithDictionary:items];
     [self _prune];
   }
@@ -99,7 +102,7 @@
 
 - (void)_prune
 {
-  NSMutableArray *keysToRemove = [[NSMutableArray alloc] init];
+  NSMutableArray *keysToRemove = [NSMutableArray new];
   [FBSDKTypeUtility dictionary:_items enumerateKeysAndObjectsUsingBlock:^(NSString *objectID,
                                                                           FBSDKLikeActionController *likeActionController,
                                                                           BOOL *stop) {

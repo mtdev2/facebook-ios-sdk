@@ -17,6 +17,7 @@
 // CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 import Foundation
+import TestTools
 
 @objcMembers
 class RawServerConfigurationResponseFixtures: NSObject {
@@ -45,8 +46,8 @@ class RawServerConfigurationResponseFixtures: NSObject {
   }
 
   /// Provides a dictionary with well-known keys and random values for a network provided server configuration
-  class var random: [AnyHashable: Any] {
-    return [
+  class var random: [String: Any] {
+    [
       Keys.appEventsFeatureBitmask: Fuzzer.random,
       Keys.appName: Fuzzer.random,
       Keys.defaultShareMode: Fuzzer.random,

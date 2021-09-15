@@ -18,16 +18,41 @@
 
 #import <Foundation/Foundation.h>
 
+ #import <FBSDKCoreKit/FBSDKAppEventName.h>
+ #import <FBSDKCoreKit/FBSDKAppEventsFlushBehavior.h>
+
+@class FBSDKAccessToken;
+
 NS_ASSUME_NONNULL_BEGIN
 
 NS_SWIFT_NAME(EventLogging)
 @protocol FBSDKEventLogging
 
+@property (nonatomic, readonly) FBSDKAppEventsFlushBehavior flushBehavior;
+
+- (void)flushForReason:(NSUInteger)flushReason;
+
+- (void)logEvent:(NSString *)eventName
+      parameters:(NSDictionary<NSString *, id> *)parameters;
+
+- (void)logEvent:(NSString *)eventName
+      valueToSum:(double)valueToSum
+      parameters:(NSDictionary<NSString *, id> *)parameters;
+
 - (void)logInternalEvent:(NSString *)eventName
       isImplicitlyLogged:(BOOL)isImplicitlyLogged;
 
 - (void)logInternalEvent:(NSString *)eventName
-              parameters:(NSDictionary *)parameters
+              parameters:(NSDictionary<NSString *, id> *)parameters
+      isImplicitlyLogged:(BOOL)isImplicitlyLogged;
+
+- (void)logInternalEvent:(NSString *)eventName
+              parameters:(NSDictionary<NSString *, id> *)parameters
+      isImplicitlyLogged:(BOOL)isImplicitlyLogged
+             accessToken:(FBSDKAccessToken *)accessToken;
+
+- (void)logInternalEvent:(NSString *)eventName
+              valueToSum:(double)valueToSum
       isImplicitlyLogged:(BOOL)isImplicitlyLogged;
 
 @end

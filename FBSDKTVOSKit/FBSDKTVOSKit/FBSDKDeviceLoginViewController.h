@@ -18,7 +18,7 @@
 
 #import <UIKit/UIKit.h>
 
-#import <FBSDKCoreKit/FBSDKDeviceViewControllerBase.h>
+ #import <FBSDKCoreKit/FBSDKCoreKit.h>
 
 NS_ASSUME_NONNULL_BEGIN
 
@@ -58,7 +58,7 @@ NS_SWIFT_NAME(DeviceLoginViewControllerDelegate)
 
  @code
  // from your view controller:
- FBSDKDeviceLoginViewController *vc = [[FBSDKDeviceLoginViewController alloc] init];
+ FBSDKDeviceLoginViewController *vc = [FBSDKDeviceLoginViewController new];
  vc.delegate = self;
  [self presentViewController:vc
                     animated:YES

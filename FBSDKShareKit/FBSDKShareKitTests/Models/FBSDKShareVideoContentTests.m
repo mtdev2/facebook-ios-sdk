@@ -57,14 +57,14 @@
   NSData *data = [NSKeyedArchiver archivedDataWithRootObject:content];
   NSKeyedUnarchiver *unarchiver = [[NSKeyedUnarchiver alloc] initForReadingWithData:data];
   [unarchiver setRequiresSecureCoding:YES];
-  FBSDKShareVideoContent *unarchivedObject = [unarchiver decodeObjectOfClass:[FBSDKShareVideoContent class]
+  FBSDKShareVideoContent *unarchivedObject = [unarchiver decodeObjectOfClass:FBSDKShareVideoContent.class
                                                                       forKey:NSKeyedArchiveRootObjectKey];
   XCTAssertEqualObjects(unarchivedObject, content);
 }
 
 - (void)testValidationWithValidContent
 {
-  FBSDKShareVideoContent *content = [[FBSDKShareVideoContent alloc] init];
+  FBSDKShareVideoContent *content = [FBSDKShareVideoContent new];
   content.contentURL = [FBSDKShareModelTestUtility contentURL];
   content.peopleIDs = [FBSDKShareModelTestUtility peopleIDs];
   content.placeID = [FBSDKShareModelTestUtility placeID];
@@ -78,7 +78,7 @@
 
 - (void)testValidationWithNilVideo
 {
-  FBSDKShareVideoContent *content = [[FBSDKShareVideoContent alloc] init];
+  FBSDKShareVideoContent *content = [FBSDKShareVideoContent new];
   XCTAssertNotNil(content);
   NSError *error;
   XCTAssertFalse([FBSDKShareUtility validateShareContent:content bridgeOptions:FBSDKShareBridgeOptionsDefault error:&error]);
@@ -89,8 +89,8 @@
 
 - (void)testValidationWithNilVideoURL
 {
-  FBSDKShareVideoContent *content = [[FBSDKShareVideoContent alloc] init];
-  content.video = [[FBSDKShareVideo alloc] init];
+  FBSDKShareVideoContent *content = [FBSDKShareVideoContent new];
+  content.video = [FBSDKShareVideo new];
   XCTAssertNotNil(content);
   NSError *error;
   XCTAssertFalse([FBSDKShareUtility validateShareContent:content bridgeOptions:FBSDKShareBridgeOptionsDefault error:&error]);
@@ -105,9 +105,9 @@
 
 - (void)testValidationWithInvalidVideoURL
 {
-  FBSDKShareVideoContent *content = [[FBSDKShareVideoContent alloc] init];
-  content.video = [[FBSDKShareVideo alloc] init];
-  content.video.videoURL = [[NSURL alloc] init];
+  FBSDKShareVideoContent *content = [FBSDKShareVideoContent new];
+  content.video = [FBSDKShareVideo new];
+  content.video.videoURL = [NSURL new];
   XCTAssertNotNil(content);
   NSError *error;
   XCTAssertFalse([FBSDKShareUtility validateShareContent:content bridgeOptions:FBSDKShareBridgeOptionsDefault error:&error]);
@@ -122,8 +122,8 @@
 
 - (void)testValidationWithNonVideoURL
 {
-  FBSDKShareVideoContent *content = [[FBSDKShareVideoContent alloc] init];
-  content.video = [[FBSDKShareVideo alloc] init];
+  FBSDKShareVideoContent *content = [FBSDKShareVideoContent new];
+  content.video = [FBSDKShareVideo new];
   content.video.videoURL = [FBSDKShareModelTestUtility photoImageURL];
   XCTAssertNotNil(content);
   NSError *error;
@@ -141,7 +141,7 @@
 {
   FBSDKShareVideo *video = [FBSDKShareVideo videoWithVideoURL:[FBSDKShareModelTestUtility videoURL]];
   XCTAssertNotNil(video);
-  FBSDKShareVideoContent *content = [[FBSDKShareVideoContent alloc] init];
+  FBSDKShareVideoContent *content = [FBSDKShareVideoContent new];
   content.video = video;
   XCTAssertNotNil(content);
   NSError *error;
@@ -151,10 +151,10 @@
 
 - (void)testValidationWithValidFileVideoURLWhenBridgeOptionIsDefault
 {
-  NSURL *videoURL = [[NSBundle mainBundle].resourceURL URLByAppendingPathComponent:@"video.mp4"];
+  NSURL *videoURL = [NSBundle.mainBundle.resourceURL URLByAppendingPathComponent:@"video.mp4"];
   FBSDKShareVideo *video = [FBSDKShareVideo videoWithVideoURL:videoURL];
   XCTAssertNotNil(video);
-  FBSDKShareVideoContent *content = [[FBSDKShareVideoContent alloc] init];
+  FBSDKShareVideoContent *content = [FBSDKShareVideoContent new];
   content.video = video;
   XCTAssertNotNil(content);
   NSError *error;
@@ -169,10 +169,10 @@
 
 - (void)testValidationWithValidFileVideoURLWhenBridgeOptionIsVideoData
 {
-  NSURL *videoURL = [[NSBundle mainBundle].resourceURL URLByAppendingPathComponent:@"video.mp4"];
+  NSURL *videoURL = [NSBundle.mainBundle.resourceURL URLByAppendingPathComponent:@"video.mp4"];
   FBSDKShareVideo *video = [FBSDKShareVideo videoWithVideoURL:videoURL];
   XCTAssertNotNil(video);
-  FBSDKShareVideoContent *content = [[FBSDKShareVideoContent alloc] init];
+  FBSDKShareVideoContent *content = [FBSDKShareVideoContent new];
   content.video = video;
   XCTAssertNotNil(content);
   NSError *error;

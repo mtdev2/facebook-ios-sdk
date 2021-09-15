@@ -20,15 +20,15 @@
 @protocol FBSDKURLSessionProxying;
 @protocol FBSDKURLSessionProxyProviding;
 
-#if SWIFT_PACKAGE
- #import "FBSDKGraphRequestConnection.h"
-#else
- #import <FBSDKCoreKit/FBSDKGraphRequestConnection.h>
-#endif
+#import <FBSDKCoreKit/FBSDKGraphRequestConnection.h>
+
+#import "FBSDKGraphRequestMetadata.h"
+
+NS_ASSUME_NONNULL_BEGIN
 
 @interface FBSDKGraphRequestConnection (Internal)
 
-@property (nonatomic, readonly) NSMutableArray *requests;
+@property (nonatomic, readonly) NSMutableArray<FBSDKGraphRequestMetadata *> *requests;
 
 + (void)setCanMakeRequests;
 
@@ -47,3 +47,5 @@
 - (void)addBody:(FBSDKGraphRequestBody *)body toPostRequest:(NSMutableURLRequest *)request;
 
 @end
+
+NS_ASSUME_NONNULL_END

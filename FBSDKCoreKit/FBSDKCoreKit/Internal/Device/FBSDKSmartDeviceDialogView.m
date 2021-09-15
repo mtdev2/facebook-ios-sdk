@@ -22,15 +22,17 @@
 
  #import "FBSDKSmartDeviceDialogView.h"
 
- #import "FBSDKCoreKit+Internal.h"
  #import "FBSDKDeviceUtilities.h"
+ #import "FBSDKInternalUtility.h"
+ #import "FBSDKLogo.h"
+
+@interface FBSDKSmartDeviceDialogView ()
+@property (nonatomic) UIActivityIndicatorView *spinner;
+@property (nonatomic) UILabel *confirmationCodeLabel;
+@property (nonatomic) UIImageView *qrImageView;
+@end
 
 @implementation FBSDKSmartDeviceDialogView
-{
-  UIActivityIndicatorView *_spinner;
-  UILabel *_confirmationCodeLabel;
-  UIImageView *_qrImageView;
-}
 
 - (instancetype)initWithFrame:(CGRect)frame
 {
@@ -90,18 +92,18 @@
   const CGFloat kQRCodeMargin = (kWidth - kQRCodeSize) / 2;
 
   // build the container view.
-  UIView *dialogView = [[UIView alloc] init];
+  UIView *dialogView = [UIView new];
   dialogView.layer.cornerRadius = 3;
   dialogView.translatesAutoresizingMaskIntoConstraints = NO;
   dialogView.clipsToBounds = YES;
-  dialogView.backgroundColor = [UIColor whiteColor];
+  dialogView.backgroundColor = UIColor.whiteColor;
   [self addSubview:dialogView];
   [NSLayoutConstraint constraintWithItem:dialogView attribute:NSLayoutAttributeCenterX relatedBy:NSLayoutRelationEqual toItem:self attribute:NSLayoutAttributeCenterX multiplier:1.0 constant:0].active = YES;;
   [NSLayoutConstraint constraintWithItem:dialogView attribute:NSLayoutAttributeCenterY relatedBy:NSLayoutRelationEqual toItem:self attribute:NSLayoutAttributeCenterY multiplier:1.0 constant:0].active = YES;
   [dialogView.widthAnchor constraintEqualToConstant:kWidth].active = YES;
 
   // build the header container view (which will contain the logo and code).
-  UIView *dialogHeaderView = [[UIView alloc] init];
+  UIView *dialogHeaderView = [UIView new];
   dialogHeaderView.translatesAutoresizingMaskIntoConstraints = NO;
   dialogHeaderView.backgroundColor = [UIColor colorWithRed:226.0 / 255.0 green:231.0 / 255.0 blue:235.0 / 255.0 alpha:0.85];
   [dialogView addSubview:dialogHeaderView];
@@ -134,7 +136,7 @@
   [_spinner startAnimating];
 
   // build the confirmation code (which replaces the spinner when the code is available).
-  _confirmationCodeLabel = [[UILabel alloc] init];
+  _confirmationCodeLabel = [UILabel new];
   _confirmationCodeLabel.translatesAutoresizingMaskIntoConstraints = NO;
   _confirmationCodeLabel.textColor = self._logoColor;
   _confirmationCodeLabel.font = [UIFont systemFontOfSize:kConfirmationCodeFontSize weight:UIFontWeightLight];
@@ -146,17 +148,17 @@
   _confirmationCodeLabel.hidden = YES;
 
   // build the smartlogin instructions
-  UILabel *smartInstructionLabel = [[UILabel alloc] init];
+  UILabel *smartInstructionLabel = [UILabel new];
   smartInstructionLabel.translatesAutoresizingMaskIntoConstraints = NO;
   NSString *smartInstructionString = NSLocalizedStringWithDefaultValue(
     @"DeviceLogin.SmartLogInPrompt",
     @"FacebookSDK",
-    [FBSDKInternalUtility bundleForStrings],
+    [FBSDKInternalUtility.sharedUtility bundleForStrings],
     @"To connect your account, open the Facebook app on your mobile device and check for notifications.",
     @"Instructions telling the user to open their Facebook app on a mobile device and check for a login notification."
   );
 
-  NSMutableParagraphStyle *instructionLabelParagraphStyle = [[NSMutableParagraphStyle alloc] init];
+  NSMutableParagraphStyle *instructionLabelParagraphStyle = [NSMutableParagraphStyle new];
   instructionLabelParagraphStyle.lineHeightMultiple = 1.3;
   NSMutableAttributedString *attributedSmartString = [[NSMutableAttributedString alloc] initWithString:smartInstructionString
                                                                                             attributes:@{ NSParagraphStyleAttributeName : instructionLabelParagraphStyle }];
@@ -176,13 +178,13 @@
   [dialogView.trailingAnchor constraintEqualToAnchor:smartInstructionLabel.trailingAnchor constant:kInstructionTextHorizontalMargin].active = YES;
 
   // build 'or' label
-  UILabel *orInstructionLabel = [[UILabel alloc] init];
+  UILabel *orInstructionLabel = [UILabel new];
   orInstructionLabel.translatesAutoresizingMaskIntoConstraints = NO;
   orInstructionLabel.font = [UIFont systemFontOfSize:kInstructionFontSize weight:UIFontWeightBold];
   orInstructionLabel.text = NSLocalizedStringWithDefaultValue(
     @"DeviceLogin.SmartLogInOrLabel",
     @"FacebookSDK",
-    [FBSDKInternalUtility bundleForStrings],
+    [FBSDKInternalUtility.sharedUtility bundleForStrings],
     @"-- OR --",
     @"The 'or' string for smart login instructions"
   );;
@@ -211,12 +213,12 @@
                                             constant:kQRCodeMargin].active = YES;
 
   // build the instructions UILabel
-  UILabel *instructionLabel = [[UILabel alloc] init];
+  UILabel *instructionLabel = [UILabel new];
   instructionLabel.translatesAutoresizingMaskIntoConstraints = NO;
   NSString *localizedFormatString = NSLocalizedStringWithDefaultValue(
     @"DeviceLogin.LogInPrompt",
     @"FacebookSDK",
-    [FBSDKInternalUtility bundleForStrings],
+    [FBSDKInternalUtility.sharedUtility bundleForStrings],
     @"Visit %@ and enter the code shown above.",
     @"The format string for device login instructions"
   );
@@ -242,7 +244,7 @@
                                             constant:kInstructionTextHorizontalMargin].active = YES;
 
   // build the container view for the cancel button.
-  UIView *buttonContainerView = [[UIView alloc] init];
+  UIView *buttonContainerView = [UIView new];
   buttonContainerView.translatesAutoresizingMaskIntoConstraints = NO;
   [dialogView addSubview:buttonContainerView];
   [NSLayoutConstraint constraintWithItem:buttonContainerView attribute:NSLayoutAttributeCenterX relatedBy:NSLayoutRelationEqual toItem:dialogView attribute:NSLayoutAttributeCenterX multiplier:1.0 constant:0].active = YES;
@@ -263,7 +265,7 @@
   [button setTitle:NSLocalizedStringWithDefaultValue(
     @"LoginButton.CancelLogout",
     @"FacebookSDK",
-    [FBSDKInternalUtility bundleForStrings],
+    [FBSDKInternalUtility.sharedUtility bundleForStrings],
     @"Cancel",
     @"The label for the FBSDKLoginButton action sheet to cancel logging out"
   )

@@ -22,17 +22,16 @@
 
  #import "FBSDKShareButton.h"
 
- #ifdef FBSDKCOCOAPODS
-  #import <FBSDKCoreKit/FBSDKCoreKit+Internal.h>
- #else
-  #import "FBSDKCoreKit+Internal.h"
- #endif
  #import "FBSDKShareDialog.h"
 
+FBSDKAppEventName FBSDKAppEventNameFBSDKShareButtonImpression = @"fb_share_button_impression";
+FBSDKAppEventName FBSDKAppEventNameFBSDKShareButtonDidTap = @"fb_share_button_did_tap";
+
+@interface FBSDKShareButton ()
+@property (nonatomic) FBSDKShareDialog *dialog;
+@end
+
 @implementation FBSDKShareButton
-{
-  FBSDKShareDialog *_dialog;
-}
 
  #pragma mark - Properties
 
@@ -49,7 +48,7 @@
 
  #pragma mark - FBSDKButtonImpressionTracking
 
-- (NSDictionary *)analyticsParameters
+- (NSDictionary<NSString *, id> *)analyticsParameters
 {
   return nil;
 }
@@ -72,7 +71,7 @@
   NSLocalizedStringWithDefaultValue(
     @"ShareButton.Share",
     @"FacebookSDK",
-    [FBSDKInternalUtility bundleForStrings],
+    [FBSDKInternalUtility.sharedUtility bundleForStrings],
     @"Share",
     @"The label for FBSDKShareButton"
   );
@@ -83,7 +82,7 @@
          highlightedColor:nil];
 
   [self addTarget:self action:@selector(_share:) forControlEvents:UIControlEventTouchUpInside];
-  _dialog = [[FBSDKShareDialog alloc] init];
+  _dialog = [FBSDKShareDialog new];
 }
 
 - (BOOL)isImplicitlyDisabled
@@ -95,8 +94,16 @@
 
 - (void)_share:(id)sender
 {
-  [self logTapEventWithEventName:FBSDKAppEventNameFBSDKShareButtonDidTap parameters:[self analyticsParameters]];
+  [self _logTapEventWithEventName:FBSDKAppEventNameFBSDKShareButtonDidTap parameters:[self analyticsParameters]];
   [_dialog show];
+}
+
+- (void)_logTapEventWithEventName:(NSString *)eventName parameters:(NSDictionary<NSString *, id> *)parameters
+{
+  [FBSDKAppEvents logInternalEvent:eventName
+                        parameters:parameters
+                isImplicitlyLogged:YES
+                       accessToken:[FBSDKAccessToken currentAccessToken]];
 }
 
 @end

@@ -18,18 +18,14 @@
 
 #import "FBSDKNonceUtility.h"
 
-#ifdef FBSDKCOCOAPODS
- #import <FBSDKCoreKit/FBSDKCoreKit+Internal.h>
-#else
- #import "FBSDKCoreKit+Internal.h"
-#endif
+#import "FBSDKCoreKitBasicsImportForLoginKit.h"
 
 @implementation FBSDKNonceUtility
 
 + (BOOL)isValidNonce:(NSString *)nonce
 {
-  NSString *string = [FBSDKTypeUtility stringValue:nonce];
-  NSRange whiteSpaceRange = [string rangeOfCharacterFromSet:[NSCharacterSet whitespaceCharacterSet]];
+  NSString *string = [FBSDKTypeUtility coercedToStringValue:nonce];
+  NSRange whiteSpaceRange = [string rangeOfCharacterFromSet:NSCharacterSet.whitespaceCharacterSet];
   BOOL containsWhitespace = (whiteSpaceRange.location != NSNotFound);
 
   return (([string length] > 0) && !containsWhitespace);

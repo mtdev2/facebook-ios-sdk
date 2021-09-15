@@ -18,28 +18,24 @@
 
 #import "FBSDKDeviceLoginButton.h"
 
-#ifdef FBSDKCOCOAPODS
- #import <FBSDKCoreKit/FBSDKCoreKit+Internal.h>
-#else
- #import "FBSDKCoreKit+Internal.h"
-#endif
+#import <FBSDKCoreKit_Basics/FBSDKCoreKit_Basics.h>
+
 #import "FBSDKDeviceLoginViewController.h"
 
 @interface FBSDKDeviceLoginButton () <FBSDKDeviceLoginViewControllerDelegate>
 
+@property (nonatomic) NSString *userID;
+@property (nonatomic) NSString *userName;
+
 @end
 
 @implementation FBSDKDeviceLoginButton
-{
-  NSString *_userID;
-  NSString *_userName;
-}
 
 #pragma mark - Object Lifecycle
 
 - (void)dealloc
 {
-  [[NSNotificationCenter defaultCenter] removeObserver:self];
+  [NSNotificationCenter.defaultCenter removeObserver:self];
 }
 
 - (void)layoutSubviews
@@ -103,10 +99,10 @@
   [self _updateContent];
 
   [self addTarget:self action:@selector(_buttonPressed:) forControlEvents:UIControlEventPrimaryActionTriggered];
-  [[NSNotificationCenter defaultCenter] addObserver:self
-                                           selector:@selector(_accessTokenDidChangeNotification:)
-                                               name:FBSDKAccessTokenDidChangeNotification
-                                             object:nil];
+  [NSNotificationCenter.defaultCenter addObserver:self
+                                         selector:@selector(_accessTokenDidChangeNotification:)
+                                             name:FBSDKAccessTokenDidChangeNotification
+                                           object:nil];
 }
 
 #pragma mark - Helper Methods
@@ -120,7 +116,7 @@
 
 - (void)_buttonPressed:(id)sender
 {
-  UIViewController *parentViewController = [FBSDKInternalUtility viewControllerForView:self];
+  UIViewController *parentViewController = [FBSDKInternalUtility.sharedUtility viewControllerForView:self];
   if ([FBSDKAccessToken currentAccessToken]) {
     NSString *title = nil;
 
@@ -129,7 +125,7 @@
       NSLocalizedStringWithDefaultValue(
         @"LoginButton.LoggedInAs",
         @"FacebookSDK",
-        [FBSDKInternalUtility bundleForStrings],
+        [FBSDKInternalUtility.sharedUtility bundleForStrings],
         @"Logged in as %@",
         @"The format string for the FBSDKLoginButton label when the user is logged in"
       );
@@ -139,7 +135,7 @@
       NSLocalizedStringWithDefaultValue(
         @"LoginButton.LoggedIn",
         @"FacebookSDK",
-        [FBSDKInternalUtility bundleForStrings],
+        [FBSDKInternalUtility.sharedUtility bundleForStrings],
         @"Logged in using Facebook",
         @"The fallback string for the FBSDKLoginButton label when the user name is not available yet"
       );
@@ -149,7 +145,7 @@
     NSLocalizedStringWithDefaultValue(
       @"LoginButton.CancelLogout",
       @"FacebookSDK",
-      [FBSDKInternalUtility bundleForStrings],
+      [FBSDKInternalUtility.sharedUtility bundleForStrings],
       @"Cancel",
       @"The label for the FBSDKLoginButton action sheet to cancel logging out"
     );
@@ -157,7 +153,7 @@
     NSLocalizedStringWithDefaultValue(
       @"LoginButton.ConfirmLogOut",
       @"FacebookSDK",
-      [FBSDKInternalUtility bundleForStrings],
+      [FBSDKInternalUtility.sharedUtility bundleForStrings],
       @"Log Out",
       @"The label for the FBSDKLoginButton action sheet to confirm logging out"
     );
@@ -172,7 +168,7 @@
     [alertController addAction:[UIAlertAction actionWithTitle:cancelTitle style:UIAlertActionStyleCancel handler:NULL]];
     [parentViewController presentViewController:alertController animated:YES completion:NULL];
   } else {
-    FBSDKDeviceLoginViewController *vc = [[FBSDKDeviceLoginViewController alloc] init];
+    FBSDKDeviceLoginViewController *vc = [FBSDKDeviceLoginViewController new];
     vc.delegate = self;
     vc.permissions = self.permissions;
     vc.redirectURL = self.redirectURL;
@@ -195,7 +191,7 @@
   NSString *string = NSLocalizedStringWithDefaultValue(
     @"LoginButton.LogOut",
     @"FacebookSDK",
-    [FBSDKInternalUtility bundleForStrings],
+    [FBSDKInternalUtility.sharedUtility bundleForStrings],
     @"Log out",
     @"The label for the FBSDKLoginButton when the user is currently logged in"
   );
@@ -207,7 +203,7 @@
   NSString *string = NSLocalizedStringWithDefaultValue(
     @"LoginButton.LogInLong",
     @"FacebookSDK",
-    [FBSDKInternalUtility bundleForStrings],
+    [FBSDKInternalUtility.sharedUtility bundleForStrings],
     @"Log in with Facebook",
     @"The long label for the FBSDKLoginButton when the user is currently logged out"
   );
@@ -219,7 +215,7 @@
   NSString *string = NSLocalizedStringWithDefaultValue(
     @"LoginButton.LogIn",
     @"FacebookSDK",
-    [FBSDKInternalUtility bundleForStrings],
+    [FBSDKInternalUtility.sharedUtility bundleForStrings],
     @"Log in",
     @"The short label for the FBSDKLoginButton when the user is currently logged out"
   );
@@ -235,10 +231,10 @@
       FBSDKGraphRequest *request = [[FBSDKGraphRequest alloc] initWithGraphPath:@"me?fields=id,name"
                                                                      parameters:nil
                                                                           flags:FBSDKGraphRequestFlagDisableErrorRecovery];
-      [request startWithCompletionHandler:^(FBSDKGraphRequestConnection *connection, id result, NSError *error) {
-        NSString *userID = [FBSDKTypeUtility stringValue:result[@"id"]];
+      [request startWithCompletion:^(id<FBSDKGraphRequestConnecting> connection, id result, NSError *error) {
+        NSString *userID = [FBSDKTypeUtility coercedToStringValue:result[@"id"]];
         if (!error && [[FBSDKAccessToken currentAccessToken].userID isEqualToString:userID]) {
-          self->_userName = [FBSDKTypeUtility stringValue:result[@"name"]];
+          self->_userName = [FBSDKTypeUtility coercedToStringValue:result[@"name"]];
           self->_userID = userID;
         }
       }];

@@ -17,6 +17,7 @@
 // CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 import Foundation
+import TestTools
 
 @objcMembers
 class RawAppEventsConfigurationResponseFixtures: NSObject {
@@ -29,7 +30,7 @@ class RawAppEventsConfigurationResponseFixtures: NSObject {
   }
 
   static var valid: [String: Any] {
-    return [
+    [
       Keys.topLevel: [
         Keys.defaultATEStatus: 1,
         Keys.advertiserIDCollectionEnabled: false,
@@ -39,7 +40,7 @@ class RawAppEventsConfigurationResponseFixtures: NSObject {
   }
 
   static var validMissingTopLevelKey: [String: Any] {
-    return [
+    [
       Keys.defaultATEStatus: 1,
       Keys.advertiserIDCollectionEnabled: 1,
       Keys.eventCollectionEnabled: 1,
@@ -47,7 +48,7 @@ class RawAppEventsConfigurationResponseFixtures: NSObject {
   }
 
   static var invalidValues: [String: Any] {
-    return [
+    [
       Keys.topLevel: [
         Keys.defaultATEStatus: "foo",
         Keys.advertiserIDCollectionEnabled: "bar",

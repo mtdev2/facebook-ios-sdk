@@ -18,8 +18,10 @@
 
 #import "FBSDKErrorConfiguration.h"
 
-#import "FBSDKCoreKit+Internal.h"
-#import "FBSDKErrorRecoveryConfiguration.h"
+#import "FBSDKCoreKitBasicsImport.h"
+#import "FBSDKGraphRequestProtocol.h"
+#import "FBSDKInternalUtility+Internal.h"
+#import "FBSDKSettings.h"
 
 static NSString *const kErrorCategoryOther = @"other";
 static NSString *const kErrorCategoryTransient = @"transient";
@@ -27,12 +29,13 @@ static NSString *const kErrorCategoryLogin = @"login";
 
 #define FBSDKERRORCONFIGURATION_DICTIONARY_KEY @"configurationDictionary"
 
-@implementation FBSDKErrorConfiguration
-{
-  NSMutableDictionary *_configurationDictionary;
-}
+@interface FBSDKErrorConfiguration ()
+@property (nonatomic) NSMutableDictionary<NSString *, id> *configurationDictionary;
+@end
 
-- (instancetype)initWithDictionary:(NSDictionary *)dictionary
+@implementation FBSDKErrorConfiguration
+
+- (instancetype)initWithDictionary:(NSDictionary<NSString *, id> *)dictionary
 {
   if ((self = [super init])) {
     if (dictionary) {
@@ -43,7 +46,7 @@ static NSString *const kErrorCategoryLogin = @"login";
       NSLocalizedStringWithDefaultValue(
         @"ErrorRecovery.OK",
         @"FacebookSDK",
-        [FBSDKInternalUtility bundleForStrings],
+        [FBSDKInternalUtility.sharedUtility bundleForStrings],
         @"OK",
         @"The title of the label to start attempting error recovery"
       );
@@ -51,7 +54,7 @@ static NSString *const kErrorCategoryLogin = @"login";
       NSLocalizedStringWithDefaultValue(
         @"ErrorRecovery.Cancel",
         @"FacebookSDK",
-        [FBSDKInternalUtility bundleForStrings],
+        [FBSDKInternalUtility.sharedUtility bundleForStrings],
         @"Cancel",
         @"The title of the label to decline attempting error recovery"
       );
@@ -59,7 +62,7 @@ static NSString *const kErrorCategoryLogin = @"login";
       NSLocalizedStringWithDefaultValue(
         @"ErrorRecovery.Transient.Suggestion",
         @"FacebookSDK",
-        [FBSDKInternalUtility bundleForStrings],
+        [FBSDKInternalUtility.sharedUtility bundleForStrings],
         @"The server is temporarily busy, please try again.",
         @"The fallback message to display to retry transient errors"
       );
@@ -67,7 +70,7 @@ static NSString *const kErrorCategoryLogin = @"login";
       NSLocalizedStringWithDefaultValue(
         @"ErrorRecovery.Login.Suggestion",
         @"FacebookSDK",
-        [FBSDKInternalUtility bundleForStrings],
+        [FBSDKInternalUtility.sharedUtility bundleForStrings],
         @"Please log into this app again to reconnect your Facebook account.",
         @"The fallback message to display to recover invalidated tokens"
       );
@@ -110,12 +113,12 @@ static NSString *const kErrorCategoryLogin = @"login";
   return configuration;
 }
 
-- (void)updateWithArray:(NSArray<NSDictionary *> *)array
+- (void)updateWithArray:(NSArray<NSDictionary<NSString *, id> *> *)array
 {
-  for (NSDictionary *dictionary in [FBSDKTypeUtility arrayValue:array]) {
+  for (NSDictionary<NSString *, id> *dictionary in [FBSDKTypeUtility arrayValue:array]) {
     [FBSDKTypeUtility dictionary:dictionary enumerateKeysAndObjectsUsingBlock:^(NSString *key, id obj, BOOL *stop) {
       FBSDKGraphRequestError category;
-      NSString *action = [FBSDKTypeUtility stringValue:dictionary[@"name"]];
+      NSString *action = [FBSDKTypeUtility coercedToStringValue:dictionary[@"name"]];
       if ([action isEqualToString:kErrorCategoryOther]) {
         category = FBSDKGraphRequestErrorOther;
       } else if ([action isEqualToString:kErrorCategoryTransient]) {
@@ -127,8 +130,8 @@ static NSString *const kErrorCategoryLogin = @"login";
       NSArray *options = dictionary[@"recovery_options"];
 
       NSArray *validItems = [FBSDKTypeUtility dictionary:dictionary objectForKey:@"items" ofType:NSArray.class];
-      for (NSDictionary *codeSubcodesDictionary in validItems) {
-        NSDictionary *validCodeSubcodesDictionary = [FBSDKTypeUtility dictionaryValue:codeSubcodesDictionary];
+      for (NSDictionary<NSString *, id> *codeSubcodesDictionary in validItems) {
+        NSDictionary<NSString *, id> *validCodeSubcodesDictionary = [FBSDKTypeUtility dictionaryValue:codeSubcodesDictionary];
         if (!validCodeSubcodesDictionary) {
           continue;
         }
@@ -139,7 +142,7 @@ static NSString *const kErrorCategoryLogin = @"login";
           return;
         }
 
-        NSMutableDictionary *currentSubcodes = self->_configurationDictionary[code];
+        NSMutableDictionary<NSString *, id> *currentSubcodes = self->_configurationDictionary[code];
         if (!currentSubcodes) {
           currentSubcodes = [NSMutableDictionary dictionary];
           [FBSDKTypeUtility dictionary:self->_configurationDictionary setObject:currentSubcodes forKey:code];
@@ -177,11 +180,11 @@ static NSString *const kErrorCategoryLogin = @"login";
   return YES;
 }
 
-- (id)initWithCoder:(NSCoder *)decoder
+- (instancetype)initWithCoder:(NSCoder *)decoder
 {
-  NSSet *classes = [[NSSet alloc] initWithObjects:[NSDictionary class], [FBSDKErrorRecoveryConfiguration class], nil];
-  NSDictionary *configurationDictionary = [decoder decodeObjectOfClasses:classes
-                                                                  forKey:FBSDKERRORCONFIGURATION_DICTIONARY_KEY];
+  NSSet *classes = [[NSSet alloc] initWithObjects:[NSDictionary<NSString *, id> class], FBSDKErrorRecoveryConfiguration.class, nil];
+  NSDictionary<NSString *, id> *configurationDictionary = [decoder decodeObjectOfClasses:classes
+                                                                                  forKey:FBSDKERRORCONFIGURATION_DICTIONARY_KEY];
   return [self initWithDictionary:configurationDictionary];
 }
 

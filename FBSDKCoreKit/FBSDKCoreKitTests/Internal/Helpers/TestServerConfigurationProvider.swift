@@ -16,11 +16,50 @@
 // IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 // CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-@objcMembers
-class TestServerConfigurationProvider: NSObject, ServerConfigurationProviding {
-  static var capturedCompletionBlock: ServerConfigurationBlock?
+import TestTools
 
-  static func loadServerConfiguration(completionBlock: @escaping ServerConfigurationBlock) {
+@objcMembers
+class TestServerConfigurationProvider: NSObject, ServerConfigurationProviding, ServerConfigurationLoading {
+
+  var capturedCompletionBlock: ServerConfigurationBlock?
+  var secondCapturedCompletionBlock: ServerConfigurationBlock?
+  var loadServerConfigurationWasCalled = false
+  var stubbedRequestToLoadServerConfiguration: GraphRequest?
+  var stubbedServerConfiguration: ServerConfiguration
+  var requestToLoadConfigurationCallWasCalled = false
+  var didRetrieveCachedServerConfiguration = false
+
+  init(configuration: ServerConfiguration = ServerConfigurationFixtures.defaultConfig) {
+    stubbedServerConfiguration = configuration
+  }
+
+  func cachedServerConfiguration() -> ServerConfiguration {
+    didRetrieveCachedServerConfiguration = true
+    return stubbedServerConfiguration
+  }
+
+  func loadServerConfiguration(completionBlock: ServerConfigurationBlock?) {
+    loadServerConfigurationWasCalled = true
+    guard capturedCompletionBlock == nil else {
+      secondCapturedCompletionBlock = completionBlock
+      return
+    }
+
     capturedCompletionBlock = completionBlock
+  }
+
+  func reset() {
+    requestToLoadConfigurationCallWasCalled = false
+    loadServerConfigurationWasCalled = false
+    capturedCompletionBlock = nil
+    secondCapturedCompletionBlock = nil
+  }
+
+  func processLoadRequestResponse(_ result: Any, error: Error?, appID: String) {
+  }
+
+  func request(toLoadServerConfiguration appID: String) -> GraphRequest? {
+    requestToLoadConfigurationCallWasCalled = true
+    return stubbedRequestToLoadServerConfiguration
   }
 }

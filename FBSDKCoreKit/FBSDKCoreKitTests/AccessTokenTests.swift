@@ -16,7 +16,10 @@
 // IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 // CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-import FBSDKCoreKit
+#if BUCK
+import FacebookCore
+#endif
+
 import TestTools
 import XCTest
 
@@ -57,11 +60,11 @@ class AccessTokenTests: XCTestCase {
     AccessToken.connectionFactory = factory
 
     AccessToken.current = nil
-    AccessToken.refreshCurrentAccessToken(nil)
+    AccessToken.refreshCurrentAccessToken(completion: nil)
     XCTAssertEqual(testConnection.startCallCount, 0, "Should not start connection if no current access token available")
 
     AccessToken.current = SampleAccessTokens.validToken
-    AccessToken.refreshCurrentAccessToken(nil)
+    AccessToken.refreshCurrentAccessToken(completion: nil)
     XCTAssertEqual(testConnection.startCallCount, 1, "Should start one connection for refreshing")
   }
 
@@ -238,5 +241,4 @@ class AccessTokenTests: XCTestCase {
       )
     }
   }
-
 }

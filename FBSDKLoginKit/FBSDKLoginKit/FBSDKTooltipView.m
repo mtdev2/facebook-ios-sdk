@@ -24,11 +24,7 @@
 
  #import <CoreText/CoreText.h>
 
- #ifdef FBSDKCOCOAPODS
-  #import <FBSDKCoreKit/FBSDKCoreKit+Internal.h>
- #else
-  #import "FBSDKCoreKit+Internal.h"
- #endif
+ #import "FBSDKCoreKit+Internal.h"
 
 static const CGFloat kTransitionDuration = 0.3;
 static const CGFloat kZoomOutScale = 0.001f;
@@ -49,28 +45,33 @@ static CGMutablePathRef _fbsdkCreateDownPointingBubbleWithRect(CGRect rect, CGFl
 
  #pragma mark -
 
+@interface FBSDKTooltipView ()
+
+@property (nonatomic) CGPoint positionInView;
+@property (nonatomic) CFAbsoluteTime displayTime;
+@property (nonatomic) CFTimeInterval minimumDisplayDuration;
+@property (nonatomic) UILabel *textLabel;
+@property (nonatomic) UITapGestureRecognizer *insideTapGestureRecognizer;
+@property (nonatomic) CGFloat leftWidth;
+@property (nonatomic) CGFloat rightWidth;
+@property (nonatomic) CGFloat arrowMidpoint;
+@property (nonatomic) BOOL pointingUp;
+@property (nonatomic) BOOL isFadingOut;
+// style
+@property (nonatomic) UIColor *innerStrokeColor;
+@property (nonatomic) CGFloat arrowHeight;
+@property (nonatomic) CGFloat textPadding;
+@property (nonatomic) CGFloat maximumTextWidth;
+@property (nonatomic) CGFloat verticalTextOffset;
+@property (nonatomic) CGFloat verticalCrossOffset;
+@property (nonatomic) NSArray *gradientColors;
+@property (nonatomic) UIColor *crossCloseGlyphColor;
+
+@end
+
 @implementation FBSDKTooltipView
 {
-  CGPoint _positionInView;
-  CFAbsoluteTime _displayTime;
-  CFTimeInterval _minimumDisplayDuration;
-  UILabel *_textLabel;
-  UITapGestureRecognizer *_insideTapGestureRecognizer;
-  CGFloat _leftWidth;
-  CGFloat _rightWidth;
-  CGFloat _arrowMidpoint;
-  BOOL _pointingUp;
-  BOOL _isFadingOut;
-  // style
-  UIColor *_innerStrokeColor;
-  CGFloat _arrowHeight;
-  CGFloat _textPadding;
-  CGFloat _maximumTextWidth;
-  CGFloat _verticalTextOffset;
-  CGFloat _verticalCrossOffset;
   FBSDKTooltipColorStyle _colorStyle;
-  NSArray *_gradientColors;
-  UIColor *_crossCloseGlyphColor;
 }
 
 - (instancetype)initWithTagline:(NSString *)tagline message:(NSString *)message colorStyle:(FBSDKTooltipColorStyle)colorStyle
@@ -79,7 +80,7 @@ static CGMutablePathRef _fbsdkCreateDownPointingBubbleWithRect(CGRect rect, CGFl
   if (self) {
     // Define style
     _textLabel = [[UILabel alloc] initWithFrame:CGRectZero];
-    _textLabel.backgroundColor = [UIColor clearColor];
+    _textLabel.backgroundColor = UIColor.clearColor;
     _textLabel.autoresizingMask = UIViewAutoresizingFlexibleRightMargin;
     _textLabel.numberOfLines = 0;
     _textLabel.font = [UIFont boldSystemFontOfSize:kNUXFontSize];
@@ -101,9 +102,9 @@ static CGMutablePathRef _fbsdkCreateDownPointingBubbleWithRect(CGRect rect, CGFl
     [self addGestureRecognizer:_insideTapGestureRecognizer];
 
     self.opaque = NO;
-    self.backgroundColor = [UIColor clearColor];
+    self.backgroundColor = UIColor.clearColor;
     self.layer.needsDisplayOnBoundsChange = YES;
-    self.layer.shadowColor = [UIColor blackColor].CGColor;
+    self.layer.shadowColor = UIColor.blackColor.CGColor;
     self.layer.shadowOpacity = 0.5f;
     self.layer.shadowOffset = CGSizeMake(0.0f, 2.0f);
     self.layer.shadowRadius = 5.0f;
@@ -209,8 +210,8 @@ static CGMutablePathRef _fbsdkCreateDownPointingBubbleWithRect(CGRect rect, CGFl
   switch (colorStyle) {
     case FBSDKTooltipColorStyleNeutralGray:
       _gradientColors = @[
-        (id)(FBSDKUIColorWithRGB(0x51, 0x50, 0x4f).CGColor),
-        (id)(FBSDKUIColorWithRGB(0x2d, 0x2c, 0x2c).CGColor)
+        (id)([[UIColor colorWithRed:(0x51 / 255.0) green:(0x50 / 255.0) blue:(0x4f / 255.0) alpha:1.0] CGColor]),
+        (id)([[UIColor colorWithRed:(0x2d / 255.0) green:(0x2c / 255.0) blue:(0x2c / 255.0) alpha:1.0] CGColor])
     ];
     _innerStrokeColor = [UIColor colorWithWhite:0.13f alpha:1.0f];
     _crossCloseGlyphColor = [UIColor colorWithWhite:0.69f alpha:1.0f];
@@ -219,15 +220,15 @@ static CGMutablePathRef _fbsdkCreateDownPointingBubbleWithRect(CGRect rect, CGFl
     case FBSDKTooltipColorStyleFriendlyBlue:
     default:
       _gradientColors = @[
-        (id)(FBSDKUIColorWithRGB(0x6e, 0x9c, 0xf5).CGColor),
-        (id)(FBSDKUIColorWithRGB(0x49, 0x74, 0xc6).CGColor)
+        (id)([[UIColor colorWithRed:(0x6e / 255.0) green:(0x9c / 255.0) blue:(0xf5 / 255.0) alpha:1.0] CGColor]),
+        (id)([[UIColor colorWithRed:(0x49 / 255.0) green:(0x74 / 255.0) blue:(0xc6 / 255.0) alpha:1.0] CGColor])
     ];
     _innerStrokeColor = [UIColor colorWithRed:0.12f green:0.26f blue:0.55f alpha:1.0f];
     _crossCloseGlyphColor = [UIColor colorWithRed:0.60f green:0.73f blue:1.0f alpha:1.0f];
     break;
   }
 
-  _textLabel.textColor = [UIColor whiteColor];
+  _textLabel.textColor = UIColor.whiteColor;
 }
 
  #pragma mark - Private Methods
@@ -601,9 +602,13 @@ static CGMutablePathRef _createCloseCrossGlyphWithRect(CGRect rect)
 
   UIFont *font = [UIFont boldSystemFontOfSize:kNUXFontSize];
   [attrString addAttribute:NSFontAttributeName value:font range:fullRange];
-  [attrString addAttribute:NSForegroundColorAttributeName value:[UIColor whiteColor] range:fullRange];
+  [attrString addAttribute:NSForegroundColorAttributeName value:UIColor.whiteColor range:fullRange];
   if (tagline.length) {
-    [attrString addAttribute:NSForegroundColorAttributeName value:FBSDKUIColorWithRGB(0x6D, 0x87, 0xC7) range:NSMakeRange(0, tagline.length)];
+    UIColor *color = [UIColor colorWithRed:(0x6D / 255.0)
+                                     green:(0x87 / 255.0)
+                                      blue:(0xC7 / 255.0)
+                                     alpha:1.0];
+    [attrString addAttribute:NSForegroundColorAttributeName value:color range:NSMakeRange(0, tagline.length)];
   }
 
   _textLabel.attributedText = attrString;
@@ -618,7 +623,7 @@ static CGMutablePathRef _createCloseCrossGlyphWithRect(CGRect rect)
 
 - (void)scheduleAutomaticFadeout
 {
-  [[self class] cancelPreviousPerformRequestsWithTarget:self selector:@selector(scheduleFadeoutRespectingMinimumDisplayDuration) object:nil];
+  [self.class cancelPreviousPerformRequestsWithTarget:self selector:@selector(scheduleFadeoutRespectingMinimumDisplayDuration) object:nil];
 
   if (_displayDuration > 0.0 && self.superview) {
     CFTimeInterval intervalAlreadyDisplaying = CFAbsoluteTimeGetCurrent() - _displayTime;
@@ -644,8 +649,8 @@ static CGMutablePathRef _createCloseCrossGlyphWithRect(CGRect rect)
 
 - (void)cancelAllScheduledFadeOutMethods
 {
-  [[self class] cancelPreviousPerformRequestsWithTarget:self selector:@selector(scheduleFadeoutRespectingMinimumDisplayDuration) object:nil];
-  [[self class] cancelPreviousPerformRequestsWithTarget:self selector:@selector(dismiss) object:nil];
+  [self.class cancelPreviousPerformRequestsWithTarget:self selector:@selector(scheduleFadeoutRespectingMinimumDisplayDuration) object:nil];
+  [self.class cancelPreviousPerformRequestsWithTarget:self selector:@selector(dismiss) object:nil];
 }
 
 @end

@@ -18,11 +18,9 @@
 
 #import <Foundation/Foundation.h>
 
-#if SWIFT_PACKAGE
-#import "FBSDKGraphRequestConnection.h"
-#else
 #import <FBSDKCoreKit/FBSDKGraphRequestConnection.h>
-#endif
+
+NS_ASSUME_NONNULL_BEGIN
 
 @protocol FBSDKGraphRequest;
 
@@ -33,18 +31,20 @@ NS_SWIFT_NAME(GraphRequestMetadata)
 @interface FBSDKGraphRequestMetadata : NSObject
 
 @property (nonatomic, retain) id<FBSDKGraphRequest> request;
-@property (nonatomic, copy) FBSDKGraphRequestBlock completionHandler;
-@property (nonatomic, copy) NSDictionary *batchParameters;
+@property (nonatomic, copy) FBSDKGraphRequestCompletion completionHandler;
+@property (nonatomic, copy) NSDictionary<NSString *, id> *batchParameters;
 
 - (instancetype)init NS_UNAVAILABLE;
 + (instancetype)new NS_UNAVAILABLE;
 
 - (instancetype)initWithRequest:(id<FBSDKGraphRequest>)request
-              completionHandler:(FBSDKGraphRequestBlock)handler
-                batchParameters:(NSDictionary *)batchParameters
+              completionHandler:(nullable FBSDKGraphRequestCompletion)handler
+                batchParameters:(nullable NSDictionary<NSString *, id> *)batchParameters
 NS_DESIGNATED_INITIALIZER;
 
-- (void)invokeCompletionHandlerForConnection:(FBSDKGraphRequestConnection *)connection
+- (void)invokeCompletionHandlerForConnection:(id<FBSDKGraphRequestConnecting>)connection
                                  withResults:(id)results
-                                       error:(NSError *)error;
+                                       error:(nullable NSError *)error;
 @end
+
+NS_ASSUME_NONNULL_END

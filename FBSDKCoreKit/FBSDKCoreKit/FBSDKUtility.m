@@ -18,13 +18,14 @@
 
 #import "FBSDKUtility.h"
 
-#import <CommonCrypto/CommonDigest.h>
-
-#import "FBSDKInternalUtility.h"
+#import "FBSDKAccessToken.h"
+#import "FBSDKAuthenticationToken.h"
+#import "FBSDKCoreKitBasicsImport.h"
+#import "FBSDKInternalUtility+Internal.h"
 
 @implementation FBSDKUtility
 
-+ (NSDictionary *)dictionaryWithQueryString:(NSString *)queryString
++ (NSDictionary<NSString *, id> *)dictionaryWithQueryString:(NSString *)queryString
 {
   return [FBSDKBasicUtility dictionaryWithQueryString:queryString];
 }
@@ -77,6 +78,29 @@
 + (NSString *)SHA256Hash:(NSObject *)input
 {
   return [FBSDKBasicUtility SHA256Hash:input];
+}
+
++ (NSString *)getGraphDomainFromToken
+{
+  NSString *graphDomain = FBSDKAuthenticationToken.currentAuthenticationToken.graphDomain;
+  if (!graphDomain) {
+    #pragma clang diagnostic push
+    #pragma clang diagnostic ignored "-Wdeprecated-declarations"
+    graphDomain = FBSDKAccessToken.currentAccessToken.graphDomain;
+    #pragma clange diagnostic pop
+  }
+  return graphDomain;
+}
+
++ (NSURL *)unversionedFacebookURLWithHostPrefix:(NSString *)hostPrefix
+                                           path:(NSString *)path
+                                queryParameters:(NSDictionary<NSString *, id> *)queryParameters
+                                          error:(NSError *__autoreleasing *)errorRef
+{
+  return [FBSDKInternalUtility.sharedUtility unversionedFacebookURLWithHostPrefix:hostPrefix
+                                                                             path:path
+                                                                  queryParameters:queryParameters
+                                                                            error:errorRef];
 }
 
 @end

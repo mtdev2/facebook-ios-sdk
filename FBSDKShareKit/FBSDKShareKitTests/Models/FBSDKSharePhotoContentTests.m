@@ -56,14 +56,14 @@
   NSData *data = [NSKeyedArchiver archivedDataWithRootObject:content];
   NSKeyedUnarchiver *unarchiver = [[NSKeyedUnarchiver alloc] initForReadingWithData:data];
   [unarchiver setRequiresSecureCoding:YES];
-  FBSDKSharePhotoContent *unarchivedObject = [unarchiver decodeObjectOfClass:[FBSDKSharePhotoContent class]
+  FBSDKSharePhotoContent *unarchivedObject = [unarchiver decodeObjectOfClass:FBSDKSharePhotoContent.class
                                                                       forKey:NSKeyedArchiveRootObjectKey];
   XCTAssertEqualObjects(unarchivedObject, content);
 }
 
 - (void)testWithInvalidPhotos
 {
-  FBSDKSharePhotoContent *content = [[FBSDKSharePhotoContent alloc] init];
+  FBSDKSharePhotoContent *content = [FBSDKSharePhotoContent new];
   NSArray *photos = @[
     [FBSDKShareModelTestUtility photoWithImageURL],
     [FBSDKShareModelTestUtility photoImageURL],
@@ -73,7 +73,7 @@
 
 - (void)testValidationWithValidContent
 {
-  FBSDKSharePhotoContent *content = [[FBSDKSharePhotoContent alloc] init];
+  FBSDKSharePhotoContent *content = [FBSDKSharePhotoContent new];
   content.contentURL = [FBSDKShareModelTestUtility contentURL];
   content.peopleIDs = [FBSDKShareModelTestUtility peopleIDs];
   content.photos = @[[FBSDKShareModelTestUtility photoWithImage]];
@@ -88,7 +88,7 @@
 
 - (void)testValidationWithNilPhotos
 {
-  FBSDKSharePhotoContent *content = [[FBSDKSharePhotoContent alloc] init];
+  FBSDKSharePhotoContent *content = [FBSDKSharePhotoContent new];
   XCTAssertNotNil(content);
   NSError *error;
   XCTAssertFalse([FBSDKShareUtility validateShareContent:content bridgeOptions:FBSDKShareBridgeOptionsDefault error:&error]);
@@ -99,7 +99,7 @@
 
 - (void)testValidationWithEmptyPhotos
 {
-  FBSDKSharePhotoContent *content = [[FBSDKSharePhotoContent alloc] init];
+  FBSDKSharePhotoContent *content = [FBSDKSharePhotoContent new];
   content.photos = @[];
   XCTAssertNotNil(content);
   NSError *error;

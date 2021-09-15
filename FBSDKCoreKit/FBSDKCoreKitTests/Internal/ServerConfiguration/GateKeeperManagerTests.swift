@@ -20,8 +20,7 @@ import FBSDKCoreKit
 import TestTools
 import XCTest
 
-// swiftlint:disable type_body_length file_length
-
+// swiftlint:disable file_length
 class GateKeeperManagerTests: XCTestCase {
 
   let requestFactory = TestGraphRequestFactory()
@@ -40,7 +39,6 @@ class GateKeeperManagerTests: XCTestCase {
       connectionProvider: connectionFactory,
       store: store
     )
-    GateKeeperManager.logger = TestLogger()
   }
 
   override func tearDown() {
@@ -55,10 +53,6 @@ class GateKeeperManagerTests: XCTestCase {
   func testDefaultDependencies() {
     GateKeeperManager.reset()
 
-    XCTAssertNotNil(
-      GateKeeperManager.logger,
-      "Should have a logger by default"
-    )
     XCTAssertNil(
       GateKeeperManager.requestProvider,
       "Should not have a graph request factory by default"
@@ -134,16 +128,6 @@ class GateKeeperManagerTests: XCTestCase {
     GateKeeperManager.loadGateKeepers { _ in
       XCTFail("Should not invoke the completion when exiting early")
     }
-    XCTAssertEqual(
-      TestLogger.capturedLogEntry,
-      "Cannot load gate keepers before configuring.",
-      "Should log a developer warning when trying to use a non-configured manager"
-    )
-    XCTAssertEqual(
-      TestLogger.capturedLoggingBehavior,
-      LoggingBehavior.developerErrors.rawValue,
-      "Should log a developer warning when trying to use a non-configured manager"
-    )
   }
 
   func testLoadingGateKeepersWithoutAppIdWithoutCompletion() {
@@ -267,14 +251,13 @@ class GateKeeperManagerTests: XCTestCase {
 
     XCTAssertNil(
       GateKeeperManager.gateKeepers,
-      "Should not have gatekeeprs for the current app identifier by default"
+      "Should not have gatekeepers for the current app identifier by default"
     )
   }
 
   // MARK: - Request Creation
 
   func testCreatingRequest() {
-    requestFactory.stubbedRequest = GraphRequest(graphPath: "me")
     let appIdentifier = "foo"
     let version = "bar"
     TestSettings.appID = appIdentifier

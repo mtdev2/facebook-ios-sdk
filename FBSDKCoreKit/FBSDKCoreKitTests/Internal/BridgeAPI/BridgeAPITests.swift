@@ -16,23 +16,82 @@
 // IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 // CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
+import TestTools
 import XCTest
 
-class BridgeAPIRequestTests: XCTestCase {
+class BridgeAPITests: XCTestCase {
 
-  func testDefaultProcessInfo() {
+  let processInfo = TestProcessInfo()
+  let logger = TestLogger()
+  let urlOpener = TestInternalURLOpener()
+  let responseFactory = TestBridgeAPIResponseFactory()
+  let frameworkLoader = TestDylibResolver()
+  let appURLSchemeProvider = TestInternalUtility()
+
+  func testDefaults() {
     XCTAssertTrue(
       BridgeAPI.shared.processInfo is ProcessInfo,
       "The shared bridge API should use the system provided process info by default"
     )
+    XCTAssertTrue(
+      BridgeAPI.shared.logger is Logger,
+      "The shared bridge API should use the expected logger type by default"
+    )
+    XCTAssertEqual(
+      BridgeAPI.shared.urlOpener as? UIApplication,
+      UIApplication.shared,
+      "Should use the expected concrete url opener by default"
+    )
+    XCTAssertTrue(
+      BridgeAPI.shared.bridgeAPIResponseFactory is BridgeAPIResponseFactory,
+      "Should use and instance of the expected concrete response factory type by default"
+    )
+    XCTAssertEqual(
+      BridgeAPI.shared.frameworkLoader as? DynamicFrameworkLoader,
+      DynamicFrameworkLoader.shared(),
+      "Should use the expected instance of dynamic framework loader"
+    )
+    XCTAssertEqual(
+      BridgeAPI.shared.appURLSchemeProvider as? InternalUtility,
+      InternalUtility.shared,
+      "Should use the expected instance of internal utility"
+    )
   }
 
-  func testConfiguringWithProcessInfo() {
-    let api = BridgeAPI(processInfo: TestProcessInfo())
+  func testConfiguringWithDependencies() {
+    let api = BridgeAPI(
+      processInfo: processInfo,
+      logger: logger,
+      urlOpener: urlOpener,
+      bridgeAPIResponseFactory: responseFactory,
+      frameworkLoader: frameworkLoader,
+      appURLSchemeProvider: appURLSchemeProvider
+    )
 
-    XCTAssertTrue(
-      api.processInfo is TestProcessInfo,
+    XCTAssertEqual(
+      api.processInfo as? TestProcessInfo,
+      processInfo,
       "Should be able to create a bridge api with a specific process info"
+    )
+    XCTAssertEqual(
+      api.logger as? TestLogger,
+      logger,
+      "Should be able to create a bridge api with a specific logger"
+    )
+    XCTAssertEqual(
+      api.urlOpener as? TestInternalURLOpener,
+      urlOpener,
+      "Should be able to create a bridge api with a specific url opener"
+    )
+    XCTAssertEqual(
+      api.bridgeAPIResponseFactory as? TestBridgeAPIResponseFactory,
+      responseFactory,
+      "Should be able to create a bridge api with a specific response factory"
+    )
+    XCTAssertEqual(
+      api.frameworkLoader as? TestDylibResolver,
+      frameworkLoader,
+      "Should be able to create a bridge api with a specific framework loader"
     )
   }
 }

@@ -18,43 +18,26 @@
 
 #import <Foundation/Foundation.h>
 
-#if SWIFT_PACKAGE
-#import "FBSDKButton.h"
-#else
 #import <FBSDKCoreKit/FBSDKButton.h>
-#endif
+#import <FBSDKCoreKit/FBSDKButtonImpressionTracking.h>
 
-#import "FBSDKIcon.h"
-
-NS_SWIFT_NAME(FBButtonImpressionTracking)
-@protocol FBSDKButtonImpressionTracking <NSObject>
-
-@property (nonatomic, readonly, copy) NSDictionary<NSString *, id> *analyticsParameters;
-@property (nonatomic, readonly, copy) NSString *impressionTrackingEventName;
-@property (nonatomic, readonly, copy) NSString *impressionTrackingIdentifier;
-
-@end
+#import "FBSDKIcon+Internal.h"
 
 @interface FBSDKButton ()
 
-@property (nonatomic, readonly, getter=isImplicitlyDisabled) BOOL implicitlyDisabled;
++ (void)setApplicationActivationNotifier:(id)notifier;
 
 - (void)logTapEventWithEventName:(NSString *)eventName
-                      parameters:(NSDictionary *)parameters;
-- (void)checkImplicitlyDisabled;
+                      parameters:(NSDictionary<NSString *, id> *)parameters;
 - (void)configureButton;
-- (void)configureWithIcon:(FBSDKIcon *)icon
-                    title:(NSString *)title
-          backgroundColor:(UIColor *)backgroundColor
-         highlightedColor:(UIColor *)highlightedColor;
-- (void)configureWithIcon:(FBSDKIcon *)icon
-                    title:(NSString *)title
-          backgroundColor:(UIColor *)backgroundColor
-         highlightedColor:(UIColor *)highlightedColor
-            selectedTitle:(NSString *)selectedTitle
-             selectedIcon:(FBSDKIcon *)selectedIcon
-            selectedColor:(UIColor *)selectedColor
- selectedHighlightedColor:(UIColor *)selectedHighlightedColor;
+- (void) configureWithIcon:(FBSDKIcon *)icon
+                     title:(NSString *)title
+           backgroundColor:(UIColor *)backgroundColor
+          highlightedColor:(UIColor *)highlightedColor
+             selectedTitle:(NSString *)selectedTitle
+              selectedIcon:(FBSDKIcon *)selectedIcon
+             selectedColor:(UIColor *)selectedColor
+  selectedHighlightedColor:(UIColor *)selectedHighlightedColor;
 - (UIColor *)defaultBackgroundColor;
 - (UIColor *)defaultDisabledColor;
 - (UIFont *)defaultFont;

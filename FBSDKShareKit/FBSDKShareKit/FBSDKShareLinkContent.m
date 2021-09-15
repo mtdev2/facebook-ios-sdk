@@ -18,11 +18,8 @@
 
 #import "FBSDKShareLinkContent.h"
 
-#ifdef FBSDKCOCOAPODS
- #import <FBSDKCoreKit/FBSDKCoreKit+Internal.h>
-#else
- #import "FBSDKCoreKit+Internal.h"
-#endif
+#import "FBSDKCoreKitBasicsImportForShareKit.h"
+#import "FBSDKHasher.h"
 #import "FBSDKHashtag.h"
 #import "FBSDKShareUtility.h"
 
@@ -63,8 +60,8 @@
 
 - (void)setPeopleIDs:(NSArray<NSString *> *)peopleIDs
 {
-  [FBSDKShareUtility assertCollection:peopleIDs ofClass:[NSString class] name:@"peopleIDs"];
-  if (![FBSDKInternalUtility object:_peopleIDs isEqualToObject:peopleIDs]) {
+  [FBSDKShareUtility assertCollection:peopleIDs ofClass:NSString.class name:@"peopleIDs"];
+  if (![FBSDKInternalUtility.sharedUtility object:_peopleIDs isEqualToObject:peopleIDs]) {
     _peopleIDs = [peopleIDs copy];
   }
 }
@@ -109,7 +106,7 @@
     _quote.hash,
     _shareUUID.hash,
   };
-  return [FBSDKMath hashWithIntegerArray:subhashes count:sizeof(subhashes) / sizeof(subhashes[0])];
+  return [FBSDKHasher hashWithIntegerArray:subhashes count:sizeof(subhashes) / sizeof(subhashes[0])];
 }
 
 - (BOOL)isEqual:(id)object
@@ -117,7 +114,7 @@
   if (self == object) {
     return YES;
   }
-  if (![object isKindOfClass:[FBSDKShareLinkContent class]]) {
+  if (![object isKindOfClass:FBSDKShareLinkContent.class]) {
     return NO;
   }
   return [self isEqualToShareLinkContent:(FBSDKShareLinkContent *)object];
@@ -126,14 +123,14 @@
 - (BOOL)isEqualToShareLinkContent:(FBSDKShareLinkContent *)content
 {
   return (content
-    && [FBSDKInternalUtility object:_contentURL isEqualToObject:content.contentURL]
-    && [FBSDKInternalUtility object:_hashtag isEqualToObject:content.hashtag]
-    && [FBSDKInternalUtility object:_peopleIDs isEqualToObject:content.peopleIDs]
-    && [FBSDKInternalUtility object:_placeID isEqualToObject:content.placeID]
-    && [FBSDKInternalUtility object:_ref isEqualToObject:content.ref]
-    && [FBSDKInternalUtility object:_pageID isEqualToObject:content.pageID]
-    && [FBSDKInternalUtility object:_shareUUID isEqualToObject:content.shareUUID])
-  && [FBSDKInternalUtility object:_quote isEqualToObject:content.quote];
+    && [FBSDKInternalUtility.sharedUtility object:_contentURL isEqualToObject:content.contentURL]
+    && [FBSDKInternalUtility.sharedUtility object:_hashtag isEqualToObject:content.hashtag]
+    && [FBSDKInternalUtility.sharedUtility object:_peopleIDs isEqualToObject:content.peopleIDs]
+    && [FBSDKInternalUtility.sharedUtility object:_placeID isEqualToObject:content.placeID]
+    && [FBSDKInternalUtility.sharedUtility object:_ref isEqualToObject:content.ref]
+    && [FBSDKInternalUtility.sharedUtility object:_pageID isEqualToObject:content.pageID]
+    && [FBSDKInternalUtility.sharedUtility object:_shareUUID isEqualToObject:content.shareUUID])
+  && [FBSDKInternalUtility.sharedUtility object:_quote isEqualToObject:content.quote];
 }
 
 #pragma mark - NSCoding
@@ -146,14 +143,14 @@
 - (instancetype)initWithCoder:(NSCoder *)decoder
 {
   if ((self = [self init])) {
-    _contentURL = [decoder decodeObjectOfClass:[NSURL class] forKey:FBSDK_SHARE_STATUS_CONTENT_CONTENT_URL_KEY];
-    _hashtag = [decoder decodeObjectOfClass:[FBSDKHashtag class] forKey:FBSDK_SHARE_STATUS_CONTENT_HASHTAG_KEY];
-    _peopleIDs = [decoder decodeObjectOfClass:[NSArray class] forKey:FBSDK_SHARE_STATUS_CONTENT_PEOPLE_IDS_KEY];
-    _placeID = [decoder decodeObjectOfClass:[NSString class] forKey:FBSDK_SHARE_STATUS_CONTENT_PLACE_ID_KEY];
-    _ref = [decoder decodeObjectOfClass:[NSString class] forKey:FBSDK_SHARE_STATUS_CONTENT_REF_KEY];
-    _pageID = [decoder decodeObjectOfClass:[NSString class] forKey:FBSDK_SHARE_STATUS_CONTENT_PAGE_ID_KEY];
-    _quote = [decoder decodeObjectOfClass:[NSString class] forKey:FBSDK_SHARE_STATUS_CONTENT_QUOTE_TEXT_KEY];
-    _shareUUID = [decoder decodeObjectOfClass:[NSString class] forKey:FBSDK_SHARE_STATUS_CONTENT_UUID_KEY];
+    _contentURL = [decoder decodeObjectOfClass:NSURL.class forKey:FBSDK_SHARE_STATUS_CONTENT_CONTENT_URL_KEY];
+    _hashtag = [decoder decodeObjectOfClass:FBSDKHashtag.class forKey:FBSDK_SHARE_STATUS_CONTENT_HASHTAG_KEY];
+    _peopleIDs = [decoder decodeObjectOfClass:NSArray.class forKey:FBSDK_SHARE_STATUS_CONTENT_PEOPLE_IDS_KEY];
+    _placeID = [decoder decodeObjectOfClass:NSString.class forKey:FBSDK_SHARE_STATUS_CONTENT_PLACE_ID_KEY];
+    _ref = [decoder decodeObjectOfClass:NSString.class forKey:FBSDK_SHARE_STATUS_CONTENT_REF_KEY];
+    _pageID = [decoder decodeObjectOfClass:NSString.class forKey:FBSDK_SHARE_STATUS_CONTENT_PAGE_ID_KEY];
+    _quote = [decoder decodeObjectOfClass:NSString.class forKey:FBSDK_SHARE_STATUS_CONTENT_QUOTE_TEXT_KEY];
+    _shareUUID = [decoder decodeObjectOfClass:NSString.class forKey:FBSDK_SHARE_STATUS_CONTENT_UUID_KEY];
   }
   return self;
 }
@@ -174,7 +171,7 @@
 
 - (id)copyWithZone:(NSZone *)zone
 {
-  FBSDKShareLinkContent *copy = [[FBSDKShareLinkContent alloc] init];
+  FBSDKShareLinkContent *copy = [FBSDKShareLinkContent new];
   copy->_contentURL = [_contentURL copy];
   copy->_hashtag = [_hashtag copy];
   copy->_peopleIDs = [_peopleIDs copy];

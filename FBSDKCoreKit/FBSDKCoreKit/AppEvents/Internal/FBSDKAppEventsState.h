@@ -17,6 +17,7 @@
 // CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #import <Foundation/Foundation.h>
+#import "FBSDKEventsProcessing.h"
 
 // this type is not thread safe.
 NS_SWIFT_NAME(AppEventsState)
@@ -32,11 +33,13 @@ NS_SWIFT_NAME(AppEventsState)
 + (instancetype)new NS_UNAVAILABLE;
 - (instancetype)initWithToken:(NSString *)tokenString appID:(NSString *)appID NS_DESIGNATED_INITIALIZER;
 
-- (void)addEvent:(NSDictionary *)eventDictionary isImplicit:(BOOL)isImplicit;
+- (void)addEvent:(NSDictionary<NSString *, id> *)eventDictionary isImplicit:(BOOL)isImplicit;
 - (void)addEventsFromAppEventState:(FBSDKAppEventsState *)appEventsState;
 - (BOOL)isCompatibleWithAppEventsState:(FBSDKAppEventsState *)appEventsState;
 - (BOOL)isCompatibleWithTokenString:(NSString *)tokenString appID:(NSString *)appID;
-- (NSString *)JSONStringForEvents:(BOOL)includeImplicitEvents;
+- (NSString *)JSONStringForEventsIncludingImplicitEvents:(BOOL)includeImplicitEvents;
 - (NSString *)extractReceiptData;
+
++ (void)configureWithEventProcessors:(NSArray<id<FBSDKEventsProcessing>> *)eventProcessors;
 
 @end

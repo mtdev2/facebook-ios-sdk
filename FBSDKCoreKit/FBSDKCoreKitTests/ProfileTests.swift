@@ -17,27 +17,33 @@
 // CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 import FBSDKCoreKit
+import TestTools
 import XCTest
 
 class ProfileTests: XCTestCase {
 
   var store = UserDefaultsSpy()
+  var notificationCenter = TestNotificationCenter()
 
   override func setUp() {
     super.setUp()
-
-    Profile.reset()
-    TestTokenWallet.reset()
+    TestAccessTokenWallet.reset()
+    Profile.configure(
+      store: store,
+      accessTokenProvider: TestAccessTokenWallet.self,
+      notificationCenter: notificationCenter
+    )
   }
 
   override func tearDown() {
     super.tearDown()
 
     Profile.reset()
-    TestTokenWallet.reset()
+    TestAccessTokenWallet.reset()
   }
 
   func testDefaultStore() {
+    Profile.reset()
     XCTAssertNil(
       Profile.store,
       "Should not have a default data store"
@@ -45,14 +51,21 @@ class ProfileTests: XCTestCase {
   }
 
   func testConfiguringWithStore() {
-    Profile.configure(store: store, accessTokenProvider: TestTokenWallet.self)
     XCTAssertTrue(
       Profile.store === store,
       "Should be able to set a persistent data store"
     )
   }
 
+  func testConfiguringWithNotificationCenter() {
+    XCTAssertTrue(
+      Profile.notificationCenter === notificationCenter,
+      "Should be able to set a Notification Posting"
+    )
+  }
+
   func testDefaultAccessTokenProvider() {
+    Profile.reset()
     XCTAssertNil(
       Profile.accessTokenProvider,
       "Should not have a default access token provider"
@@ -60,10 +73,35 @@ class ProfileTests: XCTestCase {
   }
 
   func testConfiguringWithTokenProvider() {
-    Profile.configure(store: store, accessTokenProvider: TestTokenWallet.self)
     XCTAssertTrue(
-      Profile.accessTokenProvider is TestTokenWallet.Type,
+      Profile.accessTokenProvider is TestAccessTokenWallet.Type,
       "Should be able to set a token wallet"
+    )
+  }
+
+  func testHashability() {
+    let profile = SampleUserProfiles.createValid()
+    let profile2 = SampleUserProfiles.createValid(userID: name)
+
+    XCTAssertEqual(
+      profile.hash,
+      profile.hash,
+      "Hashed profiles should be consistent"
+    )
+    XCTAssertNotEqual(
+      profile.hash,
+      profile2.hash,
+      "Hashed profiles should be unique"
+    )
+  }
+
+  func testFetchingCachedProfile() {
+    _ = Profile.fetchCachedProfile()
+
+    XCTAssertEqual(
+      store.capturedObjectRetrievalKey,
+      "com.facebook.sdk.FBSDKProfile.currentProfile",
+      "Fetching a cached profile should query the store with the expected retrieval key"
     )
   }
 }

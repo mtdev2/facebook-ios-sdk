@@ -22,14 +22,11 @@
 
  #import "FBSDKLoginManagerLogger.h"
 
- #ifdef FBSDKCOCOAPODS
-  #import <FBSDKCoreKit/FBSDKCoreKit+Internal.h>
- #else
-  #import "FBSDKCoreKit+Internal.h"
- #endif
+ #import "FBSDKCoreKitBasicsImportForLoginKit.h"
  #import "FBSDKLoginError.h"
  #import "FBSDKLoginManagerLoginResult+Internal.h"
  #import "FBSDKLoginUtility.h"
+ #import "FBSDKMonotonicTime.h"
 
 NSString *const FBSDKLoginManagerLoggerAuthMethod_Native = @"fb_application_web_auth";
 NSString *const FBSDKLoginManagerLoggerAuthMethod_Browser = @"browser_auth";
@@ -58,26 +55,44 @@ static NSString *const FBSDKLoginManagerLoggerResultSkippedString = @"skipped";
 static NSString *const FBSDKLoginManagerLoggerTryNative = @"tryFBAppAuth";
 static NSString *const FBSDKLoginManagerLoggerTryBrowser = @"trySafariAuth";
 
+/** Use to log the result of the App Switch OS AlertView. Only available on OS >= iOS10 */
+FBSDKAppEventName const FBSDKAppEventNameFBSessionFASLoginDialogResult = @"fb_mobile_login_fas_dialog_result";
+
+/** Use to log the start of an auth request that cannot be fulfilled by the token cache */
+FBSDKAppEventName const FBSDKAppEventNameFBSessionAuthStart = @"fb_mobile_login_start";
+
+/** Use to log the end of an auth request that was not fulfilled by the token cache */
+FBSDKAppEventName const FBSDKAppEventNameFBSessionAuthEnd = @"fb_mobile_login_complete";
+
+/** Use to log the start of a specific auth method as part of an auth request */
+FBSDKAppEventName const FBSDKAppEventNameFBSessionAuthMethodStart = @"fb_mobile_login_method_start";
+
+/** Use to log the end of the last tried auth method as part of an auth request */
+FBSDKAppEventName const FBSDKAppEventNameFBSessionAuthMethodEnd = @"fb_mobile_login_method_complete";
+
+/** Use to log the post-login heartbeat event after  the end of an auth request*/
+FBSDKAppEventName const FBSDKAppEventNameFBSessionAuthHeartbeat = @"fb_mobile_login_heartbeat";
+
+@interface FBSDKLoginManagerLogger ()
+
+@property (nonatomic) NSString *identifier;
+@property (nonatomic) NSMutableDictionary<NSString *, id> *extras;
+@property (nonatomic) NSString *lastResult;
+@property (nonatomic) NSError *lastError;
+@property (nonatomic) NSString *authMethod;
+@property (nonatomic) NSString *loggingToken;
+
+@end
+
 @implementation FBSDKLoginManagerLogger
-{
-  @private
-  NSString *_identifier;
-  NSMutableDictionary *_extras;
 
-  NSString *_lastResult;
-  NSError *_lastError;
-
-  NSString *_authMethod;
-  NSString *_loggingToken;
-}
-
-+ (FBSDKLoginManagerLogger *)loggerFromParameters:(NSDictionary *)parameters
++ (FBSDKLoginManagerLogger *)loggerFromParameters:(NSDictionary<NSString *, id> *)parameters
                                          tracking:(FBSDKLoginTracking)tracking
 {
   NSDictionary<id, id> *clientState = [FBSDKBasicUtility objectForJSONString:parameters[FBSDKLoginManagerLoggingClientStateKey] error:NULL];
 
   id isClientState = clientState[FBSDKLoginManagerLoggingClientStateIsClientState];
-  if ([isClientState isKindOfClass:[NSNumber class]] && [isClientState boolValue]) {
+  if ([isClientState isKindOfClass:NSNumber.class] && [isClientState boolValue]) {
     FBSDKLoginManagerLogger *logger = [[self alloc] initWithLoggingToken:nil tracking:tracking];
     if (logger != nil) {
       logger->_identifier = clientState[FBSDKLoginManagerLoggerParamIdentifierKey];
@@ -129,7 +144,9 @@ static NSString *const FBSDKLoginManagerLoggerTryBrowser = @"trySafariAuth";
 - (void)endSession
 {
   [self logEvent:FBSDKAppEventNameFBSessionAuthEnd result:_lastResult error:_lastError];
-  [FBSDKAppEvents flush];
+  if (FBSDKAppEvents.flushBehavior != FBSDKAppEventsFlushBehaviorExplicitOnly) {
+    [FBSDKAppEvents flush];
+  }
 }
 
 - (void)startAuthMethod:(NSString *)authMethod
@@ -172,11 +189,11 @@ static NSString *const FBSDKLoginManagerLoggerTryBrowser = @"trySafariAuth";
   [self logEvent:FBSDKAppEventNameFBSessionAuthHeartbeat result:_lastResult error:_lastError];
 }
 
-+ (NSDictionary *)parametersWithTimeStampAndClientState:(NSDictionary *)loginParams
-                                          forAuthMethod:(NSString *)authMethod
-                                                 logger:(FBSDKLoginManagerLogger *)logger
++ (NSDictionary<NSString *, id> *)parametersWithTimeStampAndClientState:(NSDictionary<NSString *, id> *)loginParams
+                                                          forAuthMethod:(NSString *)authMethod
+                                                                 logger:(FBSDKLoginManagerLogger *)logger
 {
-  NSMutableDictionary *params = [loginParams mutableCopy];
+  NSMutableDictionary<NSString *, id> *params = [loginParams mutableCopy];
 
   NSTimeInterval timeValue = (NSTimeInterval)FBSDKMonotonicTimeGetCurrentSeconds();
   NSString *e2eTimestampString = [FBSDKBasicUtility JSONStringForObject:@{ @"init" : @(timeValue) }
@@ -196,10 +213,10 @@ static NSString *const FBSDKLoginManagerLoggerTryBrowser = @"trySafariAuth";
 - (void)willAttemptAppSwitchingBehavior
 {
   NSString *defaultUrlScheme = [NSString stringWithFormat:@"fb%@%@", [FBSDKSettings appID], [FBSDKSettings appURLSchemeSuffix] ?: @""];
-  BOOL isURLSchemeRegistered = [FBSDKInternalUtility isRegisteredURLScheme:defaultUrlScheme];
+  BOOL isURLSchemeRegistered = [FBSDKInternalUtility.sharedUtility isRegisteredURLScheme:defaultUrlScheme];
 
-  BOOL isFacebookAppCanOpenURLSchemeRegistered = [FBSDKInternalUtility isRegisteredCanOpenURLScheme:FBSDK_CANOPENURL_FACEBOOK];
-  BOOL isMessengerAppCanOpenURLSchemeRegistered = [FBSDKInternalUtility isRegisteredCanOpenURLScheme:FBSDK_CANOPENURL_MESSENGER];
+  BOOL isFacebookAppCanOpenURLSchemeRegistered = [FBSDKInternalUtility.sharedUtility isRegisteredCanOpenURLScheme:FBSDK_CANOPENURL_FACEBOOK];
+  BOOL isMessengerAppCanOpenURLSchemeRegistered = [FBSDKInternalUtility.sharedUtility isRegisteredCanOpenURLScheme:FBSDK_CANOPENURL_MESSENGER];
 
   [_extras addEntriesFromDictionary:@{
      @"isURLSchemeRegistered" : @(isURLSchemeRegistered),
@@ -231,17 +248,17 @@ static NSString *const FBSDKLoginManagerLoggerTryBrowser = @"trySafariAuth";
 }
 
 + (NSString *)clientStateForAuthMethod:(NSString *)authMethod
-                      andExistingState:(NSDictionary *)existingState
+                      andExistingState:(NSDictionary<NSString *, id> *)existingState
                                 logger:(FBSDKLoginManagerLogger *)logger
 {
-  NSDictionary *clientState = @{
+  NSDictionary<NSString *, id> *clientState = @{
     FBSDKLoginManagerLoggerParamAuthMethodKey : authMethod ?: @"",
     FBSDKLoginManagerLoggerParamIdentifierKey : logger.identifier ?: NSUUID.UUID.UUIDString,
     FBSDKLoginManagerLoggingClientStateIsClientState : @YES,
   };
 
   if (existingState) {
-    NSMutableDictionary *mutableState = [clientState mutableCopy];
+    NSMutableDictionary<NSString *, id> *mutableState = [clientState mutableCopy];
     [mutableState addEntriesFromDictionary:existingState];
     clientState = mutableState;
   }
@@ -249,9 +266,9 @@ static NSString *const FBSDKLoginManagerLoggerTryBrowser = @"trySafariAuth";
   return [FBSDKBasicUtility JSONStringForObject:clientState error:NULL invalidObjectHandler:NULL];
 }
 
-- (NSMutableDictionary *)_parametersForNewEvent
+- (NSMutableDictionary<NSString *, id> *)_parametersForNewEvent
 {
-  NSMutableDictionary *eventParameters = [[NSMutableDictionary alloc] init];
+  NSMutableDictionary<NSString *, id> *eventParameters = [NSMutableDictionary new];
 
   // NOTE: We ALWAYS add all params to each event, to ensure predictable mapping on the backend.
   [FBSDKTypeUtility dictionary:eventParameters setObject:_identifier ?: FBSDKLoginManagerLoggerValueEmpty forKey:FBSDKLoginManagerLoggerParamIdentifierKey];
@@ -266,7 +283,7 @@ static NSString *const FBSDKLoginManagerLoggerTryBrowser = @"trySafariAuth";
   return eventParameters;
 }
 
-- (void)logEvent:(NSString *)eventName params:(NSMutableDictionary *)params
+- (void)logEvent:(NSString *)eventName params:(NSMutableDictionary<NSString *, id> *)params
 {
   if (_identifier) {
     NSString *extrasJSONString = [FBSDKBasicUtility JSONStringForObject:_extras
@@ -285,7 +302,7 @@ static NSString *const FBSDKLoginManagerLoggerTryBrowser = @"trySafariAuth";
 
 - (void)logEvent:(NSString *)eventName result:(NSString *)result error:(NSError *)error
 {
-  NSMutableDictionary *params = [self _parametersForNewEvent];
+  NSMutableDictionary<NSString *, id> *params = [self _parametersForNewEvent];
 
   [FBSDKTypeUtility dictionary:params setObject:result forKey:FBSDKLoginManagerLoggerParamResultKey];
 

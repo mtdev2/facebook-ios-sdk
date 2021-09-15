@@ -22,32 +22,24 @@
 
  #import "FBSDKGameRequestFrictionlessRecipientCache.h"
 
- #if defined BUCK || defined FBSDKCOCOAPODS
-  #import <FBSDKCoreKit/FBSDKCoreKit.h>
- #else
-@import FBSDKCoreKit;
- #endif
+ #import "FBSDKCoreKitBasicsImportForShareKit.h"
+ #import "FBSDKCoreKitImport.h"
 
- #ifdef FBSDKCOCOAPODS
-  #import <FBSDKCoreKit/FBSDKCoreKit+Internal.h>
- #else
-  #import "FBSDKCoreKit+Internal.h"
- #endif
+@interface FBSDKGameRequestFrictionlessRecipientCache ()
+@property (nonatomic) NSSet *recipientIDs;
+@end
 
 @implementation FBSDKGameRequestFrictionlessRecipientCache
-{
-  NSSet *_recipientIDs;
-}
 
  #pragma mark - Object Lifecycle
 
 - (instancetype)init
 {
   if ((self = [super init])) {
-    [[NSNotificationCenter defaultCenter] addObserver:self
-                                             selector:@selector(_accessTokenDidChangeNotification:)
-                                                 name:FBSDKAccessTokenDidChangeNotification
-                                               object:nil];
+    [NSNotificationCenter.defaultCenter addObserver:self
+                                           selector:@selector(_accessTokenDidChangeNotification:)
+                                               name:FBSDKAccessTokenDidChangeNotification
+                                             object:nil];
     [self _updateCache];
   }
   return self;
@@ -55,7 +47,7 @@
 
 - (void)dealloc
 {
-  [[NSNotificationCenter defaultCenter] removeObserver:self];
+  [NSNotificationCenter.defaultCenter removeObserver:self];
 }
 
  #pragma mark - Public API
@@ -66,7 +58,7 @@
     return NO;
   }
   NSArray *recipientIDArray = [FBSDKTypeUtility arrayValue:recipients];
-  if (!recipientIDArray && [recipients isKindOfClass:[NSString class]]) {
+  if (!recipientIDArray && [recipients isKindOfClass:NSString.class]) {
     recipientIDArray = [recipients componentsSeparatedByString:@","];
   }
   if (recipientIDArray) {
@@ -78,7 +70,7 @@
   }
 }
 
-- (void)updateWithResults:(NSDictionary *)results
+- (void)updateWithResults:(NSDictionary<NSString *, id> *)results
 {
   if ([FBSDKTypeUtility boolValue:results[@"updated_frictionless"]]) {
     [self _updateCache];
@@ -106,7 +98,7 @@
                                                                  parameters:@{@"fields" : @""}
                                                                       flags:(FBSDKGraphRequestFlagDoNotInvalidateTokenOnError
                                                                         | FBSDKGraphRequestFlagDisableErrorRecovery)];
-  [request startWithCompletionHandler:^(FBSDKGraphRequestConnection *connection, id result, NSError *error) {
+  [request startWithCompletion:^(id<FBSDKGraphRequestConnecting> connection, id result, NSError *error) {
     if (!error) {
       NSArray *items = [FBSDKTypeUtility arrayValue:result[@"data"]];
       NSArray *recipientIDs = [items valueForKey:@"recipient_id"];

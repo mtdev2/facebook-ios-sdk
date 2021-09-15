@@ -22,24 +22,17 @@
 
  #import "FBSDKSendButton.h"
 
- #ifdef FBSDKCOCOAPODS
-  #import <FBSDKCoreKit/FBSDKCoreKit+Internal.h>
- #else
-  #import "FBSDKCoreKit+Internal.h"
- #endif
  #import "FBSDKMessageDialog.h"
  #import "FBSDKMessengerIcon.h"
 
+FBSDKAppEventName FBSDKAppEventNameFBSDKSendButtonImpression = @"fb_send_button_impression";
+FBSDKAppEventName FBSDKAppEventNameFBSDKSendButtonDidTap = @"fb_send_button_did_tap";
+
 @interface FBSDKSendButton () <FBSDKButtonImpressionTracking>
+@property (nonatomic) FBSDKMessageDialog *dialog;
 @end
 
- #pragma clang diagnostic push
- #pragma clang diagnostic ignored "-Wdeprecated-implementations"
 @implementation FBSDKSendButton
- #pragma clang diagnostic pop
-{
-  FBSDKMessageDialog *_dialog;
-}
 
  #pragma mark - Properties
 
@@ -56,7 +49,7 @@
 
  #pragma mark - FBSDKButtonImpressionTracking
 
-- (NSDictionary *)analyticsParameters
+- (NSDictionary<NSString *, id> *)analyticsParameters
 {
   return nil;
 }
@@ -79,7 +72,7 @@
   NSLocalizedStringWithDefaultValue(
     @"SendButton.Send",
     @"FacebookSDK",
-    [FBSDKInternalUtility bundleForStrings],
+    [FBSDKInternalUtility.sharedUtility bundleForStrings],
     @"Send",
     @"The label for FBSDKSendButton"
   );
@@ -87,13 +80,13 @@
   UIColor *backgroundColor = [UIColor colorWithRed:0.0 green:132.0 / 255.0 blue:1.0 alpha:1.0];
   UIColor *highlightedColor = [UIColor colorWithRed:0.0 green:111.0 / 255.0 blue:1.0 alpha:1.0];
 
-  [self configureWithIcon:[[FBSDKMessengerIcon alloc] init]
+  [self configureWithIcon:[FBSDKMessengerIcon new]
                     title:title
           backgroundColor:backgroundColor
          highlightedColor:highlightedColor];
 
   [self addTarget:self action:@selector(_share:) forControlEvents:UIControlEventTouchUpInside];
-  _dialog = [[FBSDKMessageDialog alloc] init];
+  _dialog = [FBSDKMessageDialog new];
 }
 
 - (BOOL)isImplicitlyDisabled
@@ -105,8 +98,16 @@
 
 - (void)_share:(id)sender
 {
-  [self logTapEventWithEventName:FBSDKAppEventNameFBSDKSendButtonDidTap parameters:self.analyticsParameters];
+  [self _logTapEventWithEventName:FBSDKAppEventNameFBSDKSendButtonDidTap parameters:self.analyticsParameters];
   [_dialog show];
+}
+
+- (void)_logTapEventWithEventName:(NSString *)eventName parameters:(NSDictionary<NSString *, id> *)parameters
+{
+  [FBSDKAppEvents logInternalEvent:eventName
+                        parameters:parameters
+                isImplicitlyLogged:YES
+                       accessToken:[FBSDKAccessToken currentAccessToken]];
 }
 
 @end

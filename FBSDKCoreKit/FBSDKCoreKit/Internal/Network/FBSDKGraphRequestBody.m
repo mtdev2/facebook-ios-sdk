@@ -19,10 +19,11 @@
 #import "FBSDKGraphRequestBody.h"
 
 #import "FBSDKConstants.h"
+#import "FBSDKCoreKitBasicsImport.h"
 #import "FBSDKCrypto.h"
 #import "FBSDKGraphRequestDataAttachment.h"
-#import "FBSDKInternalUtility.h"
 #import "FBSDKLogger.h"
+#import "FBSDKLogger+Internal.h"
 #import "FBSDKSettings.h"
 
 #define kNewline @"\r\n"
@@ -30,7 +31,7 @@
 @implementation FBSDKGraphRequestBody
 {
   NSMutableData *_data;
-  NSMutableDictionary *_json;
+  NSMutableDictionary<NSString *, id> *_json;
   NSString *_stringBoundary;
 }
 
@@ -38,7 +39,7 @@
 {
   if ((self = [super init])) {
     _stringBoundary = [FBSDKCrypto randomString:32];
-    _data = [[NSMutableData alloc] init];
+    _data = [NSMutableData new];
     _json = [NSMutableDictionary dictionary];
     _requiresMultipartDataFormat = NO;
   }
@@ -137,7 +138,7 @@
            contentType:(NSString *)contentType
           contentBlock:(FBSDKCodeBlock)contentBlock
 {
-  NSMutableArray *disposition = [[NSMutableArray alloc] init];
+  NSMutableArray *disposition = [NSMutableArray new];
   [FBSDKTypeUtility array:disposition addObject:@"Content-Disposition: form-data"];
   if (key) {
     [FBSDKTypeUtility array:disposition addObject:[[NSString alloc] initWithFormat:@"name=\"%@\"", key]];

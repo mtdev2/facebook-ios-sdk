@@ -20,11 +20,20 @@
 
 #import "FBSDKGraphRequestPiggybackManager.h"
 
+NS_ASSUME_NONNULL_BEGIN
+
 @protocol FBSDKAccessTokenProviding;
 @protocol FBSDKAccessTokenSetting;
+@protocol FBSDKServerConfigurationProviding;
+@protocol FBSDKGraphRequestProviding;
 
 @interface FBSDKGraphRequestPiggybackManager (Internal)
 
-+ (void)configureWithTokenWallet:(Class<FBSDKAccessTokenProviding, FBSDKAccessTokenSetting>)tokenWallet;
++ (void)configureWithTokenWallet:(Class<FBSDKAccessTokenProviding, FBSDKAccessTokenSetting>)tokenWallet
+                        settings:(id<FBSDKSettings>)settings
+             serverConfiguration:(id<FBSDKServerConfigurationProviding>)serverConfiguration
+                 requestProvider:(id<FBSDKGraphRequestProviding>)requestProvider;
 
 @end
+
+NS_ASSUME_NONNULL_END
